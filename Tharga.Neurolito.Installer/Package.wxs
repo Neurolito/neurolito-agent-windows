@@ -1,0 +1,158 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:util="http://wixtoolset.org/schemas/v4/wxs/util">
+
+  <!--
+    The Neurolito Agent for Windows: the agent as a Windows service, llama.cpp for it to run models with, and the
+    screensaver. Per machine, into Program Files; its data (models, logs) in ProgramData\Neurolito.
+
+    Silent install:
+      msiexec /i NeurolitoAgent.msi /qn TEAMKEY=<key> [ENERGYMODE=Never|WhileWorking|WhileReady] [SETSCREENSAVER=0]
+    TEAMKEY, ENERGYMODE and SERVERADDRESS are kept on upgrade when not given again.
+  -->
+  <Package Name="Neurolito Agent" Manufacturer="Neurolito" Version="$(var.Version)"
+           UpgradeCode="bd2bbd7b-e529-4825-86dd-d5f6f3008183" Scope="perMachine" Compressed="yes">
+
+    <SummaryInformation Description="Neurolito Agent for Windows" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of the Neurolito Agent is already installed." />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Property Id="ARPURLINFOABOUT" Value="https://neurolito.com" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/Neurolito/neurolito-agent-windows" />
+    <Property Id="ARPNOMODIFY" Value="1" />
+
+    <!-- The settings, each kept from the installed version when not given again. Read elevated, since the key is readable by administrators only. -->
+    <Property Id="TEAMKEY" Secure="yes" Hidden="yes" />
+    <Property Id="SAVED_TEAMKEY" Secure="yes" Hidden="yes">
+      <RegistrySearch Id="SavedTeamKey" Root="HKLM" Key="SOFTWARE\Neurolito\Agent" Name="Tharga:Communication:ApiKey" Type="raw" Bitness="always64" />
+    </Property>
+    <SetProperty Action="KeepTeamKey" Id="TEAMKEY" Value="[SAVED_TEAMKEY]" After="AppSearch" Condition="NOT TEAMKEY AND SAVED_TEAMKEY" Sequence="both" />
+
+    <Property Id="ENERGYMODE" Secure="yes" />
+    <Property Id="SAVED_ENERGYMODE" Secure="yes">
+      <RegistrySearch Id="SavedEnergyMode" Root="HKLM" Key="SOFTWARE\Neurolito\Agent" Name="Desktop:EnergyMode" Type="raw" Bitness="always64" />
+    </Property>
+    <SetProperty Action="KeepEnergyMode" Id="ENERGYMODE" Value="[SAVED_ENERGYMODE]" After="AppSearch" Condition="NOT ENERGYMODE AND SAVED_ENERGYMODE" Sequence="both" />
+    <SetProperty Action="DefaultEnergyMode" Id="ENERGYMODE" Value="Never" After="KeepEnergyMode" Condition="NOT ENERGYMODE" Sequence="both" />
+    <!-- The page's radio buttons hold a copy, shown as the current setting and handed back on Next. -->
+    <Property Id="UI_ENERGYMODE" Value="Never" />
+    <SetProperty Action="ShowEnergyMode" Id="UI_ENERGYMODE" Value="[ENERGYMODE]" After="DefaultEnergyMode" Sequence="ui" />
+
+    <!-- Where the agent connects. Empty means neurolito.com, as the agent's own settings say; set only for testing against another server. -->
+    <Property Id="SERVERADDRESS" Secure="yes" />
+    <Property Id="SAVED_SERVERADDRESS" Secure="yes">
+      <RegistrySearch Id="SavedServerAddress" Root="HKLM" Key="SOFTWARE\Neurolito\Agent" Name="Tharga:Communication:ServerAddress" Type="raw" Bitness="always64" />
+    </Property>
+    <SetProperty Action="KeepServerAddress" Id="SERVERADDRESS" Value="[SAVED_SERVERADDRESS]" After="AppSearch" Condition="NOT SERVERADDRESS AND SAVED_SERVERADDRESS" Sequence="both" />
+
+    <!-- Make the Neurolito screensaver the installing user's own, starting after 10 minutes. Never for other users. -->
+    <Property Id="SETSCREENSAVER" Value="1" Secure="yes" />
+
+    <Launch Condition="Installed OR TEAMKEY OR SAVED_TEAMKEY OR UILevel &gt;= 4"
+            Message="The Neurolito Agent needs your team's install key: msiexec /i NeurolitoAgent.msi TEAMKEY=&lt;key&gt;. The install page on neurolito.com shows it." />
+
+    <!-- On a full uninstall, the data folder goes too - models, logs. Not on an upgrade, which uninstalls the old version first. -->
+    <SetProperty Action="RemoveDataOnUninstall" Id="DATAFOLDER_TO_REMOVE" Value="[DataFolder]" Before="CostInitialize"
+                 Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" Sequence="execute" />
+
+    <Feature Id="Agent" Title="Neurolito Agent" Level="1" AllowAbsent="no">
+      <ComponentGroupRef Id="AgentFiles" />
+      <ComponentGroupRef Id="LlamaFiles" />
+      <ComponentRef Id="AgentService" />
+      <ComponentRef Id="Settings" />
+      <ComponentRef Id="ServerAddress" />
+      <ComponentRef Id="DataFolder" />
+      <ComponentRef Id="Screensaver" />
+      <ComponentRef Id="ScreensaverSetting" />
+    </Feature>
+
+    <UIRef Id="NeurolitoUI" />
+  </Package>
+
+  <Fragment>
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="Neurolito Agent">
+        <Directory Id="LlamaFolder" Name="llama" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="CommonAppDataFolder">
+      <Directory Id="DataFolder" Name="Neurolito">
+        <Directory Id="ModelsFolder" Name="models" />
+        <Directory Id="LogsFolder" Name="logs" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="System64Folder" />
+  </Fragment>
+
+  <Fragment>
+    <ComponentGroup Id="AgentFiles" Directory="INSTALLFOLDER">
+      <Files Include="$(var.AgentDir)\**">
+        <Exclude Files="$(var.AgentDir)\Tharga.Neurolito.Agent.exe" />
+      </Files>
+    </ComponentGroup>
+
+    <ComponentGroup Id="LlamaFiles" Directory="LlamaFolder">
+      <Files Include="$(var.LlamaDir)\**" />
+    </ComponentGroup>
+
+    <!--
+      The service runs as its own virtual account, NT SERVICE\NeurolitoAgent: least privilege, and the GPU works from it
+      as from any account. Restarted if it stops.
+    -->
+    <Component Id="AgentService" Directory="INSTALLFOLDER">
+      <File Id="AgentExe" Source="$(var.AgentDir)\Tharga.Neurolito.Agent.exe" KeyPath="yes" />
+      <ServiceInstall Id="AgentService" Name="NeurolitoAgent" DisplayName="Neurolito Agent"
+                      Description="Runs language models for your Neurolito team while nobody is using this machine."
+                      Type="ownProcess" Start="auto" ErrorControl="normal" Account="NT SERVICE\NeurolitoAgent" Vital="yes">
+        <util:ServiceConfig FirstFailureActionType="restart" SecondFailureActionType="restart" ThirdFailureActionType="restart"
+                            RestartServiceDelayInSeconds="10" ResetPeriodInDays="1" />
+      </ServiceInstall>
+      <ServiceControl Id="AgentService" Name="NeurolitoAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
+    </Component>
+
+    <!--
+      The agent's settings, read by the agent from this key. Readable by the service and administrators only, since the
+      team key is a credential. The account is given by its SID - S-1-5-80 and the SHA-1 of NEUROLITOAGENT - because the
+      permissions are set before the service, and with it the account, exists.
+    -->
+    <Component Id="Settings" Directory="INSTALLFOLDER" Guid="32951121-b444-4bc7-aa9d-6351890ae84d">
+      <RegistryKey Root="HKLM" Key="SOFTWARE\Neurolito\Agent" ForceCreateOnInstall="yes">
+        <PermissionEx Sddl="D:PAI(A;CI;KA;;;SY)(A;CI;KA;;;BA)(A;CI;KR;;;S-1-5-80-3971261960-1095350057-3374866757-4235053908-3398681378)" />
+        <RegistryValue Name="Tharga:Communication:ApiKey" Value="[TEAMKEY]" Type="string" KeyPath="yes" />
+        <RegistryValue Name="Engine:Kind" Value="LlamaServer" Type="string" />
+        <RegistryValue Name="LlamaServer:ExecutablePath" Value="[LlamaFolder]llama-server.exe" Type="string" />
+        <RegistryValue Name="LlamaServer:ModelsPath" Value="[ModelsFolder]" Type="string" />
+        <RegistryValue Name="Desktop:Enabled" Value="true" Type="string" />
+        <RegistryValue Name="Desktop:EnergyMode" Value="[ENERGYMODE]" Type="string" />
+        <RegistryValue Name="Urls" Value="http://127.0.0.1:5180" Type="string" />
+        <RegistryValue Name="Serilog:WriteTo:1:Args:path" Value="[LogsFolder]agent-.log" Type="string" />
+      </RegistryKey>
+    </Component>
+
+    <Component Id="ServerAddress" Directory="INSTALLFOLDER" Guid="67a6bc79-85b7-4034-adb6-988f548c1003" Condition="SERVERADDRESS">
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Neurolito\Agent" Name="Tharga:Communication:ServerAddress" Value="[SERVERADDRESS]" Type="string" KeyPath="yes" />
+    </Component>
+
+    <!-- Models and logs: written by the service, not by other users (ProgramData lets any user add files, so inheritance is cut). -->
+    <Component Id="DataFolder" Directory="DataFolder" Guid="d3eded7b-6c9c-4df0-bcaf-1a74cd6e601d">
+      <CreateFolder>
+        <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-80-3971261960-1095350057-3374866757-4235053908-3398681378)(A;OICI;0x1200a9;;;BU)" />
+      </CreateFolder>
+      <util:RemoveFolderEx On="uninstall" Property="DATAFOLDER_TO_REMOVE" />
+    </Component>
+
+    <!-- In System32, which is where the screen saver settings look. Windows may start it by its short name. -->
+    <Component Id="Screensaver" Directory="System64Folder" Guid="d8a7c199-6cf4-45c1-a4bf-ad35ac869864">
+      <File Id="NeurolitoScr" Source="$(var.ScreensaverFile)" Name="Neurolito.scr" KeyPath="yes" />
+    </Component>
+
+    <Component Id="ScreensaverSetting" Directory="INSTALLFOLDER" Guid="24911280-d47e-4b28-84fc-7f996099b847" Condition="SETSCREENSAVER = 1">
+      <RegistryKey Root="HKCU" Key="Control Panel\Desktop">
+        <RegistryValue Name="SCRNSAVE.EXE" Value="[System64Folder]Neurolito.scr" Type="string" KeyPath="yes" />
+        <RegistryValue Name="ScreenSaveActive" Value="1" Type="string" />
+        <RegistryValue Name="ScreenSaveTimeOut" Value="600" Type="string" />
+      </RegistryKey>
+    </Component>
+  </Fragment>
+</Wix>
