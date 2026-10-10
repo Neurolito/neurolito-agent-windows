@@ -20,12 +20,12 @@
     <Property Id="ARPHELPLINK" Value="https://github.com/Neurolito/neurolito-agent-windows" />
     <Property Id="ARPNOMODIFY" Value="1" />
 
-    <!-- The settings, each kept from the installed version when not given again. Read elevated, since the key is readable by administrators only. -->
+    <!--
+      The team key is written to a file only the service and administrators can read, and only when one is given: an
+      upgrade without it keeps the key already there. The other settings are kept from the installed version when not
+      given again.
+    -->
     <Property Id="TEAMKEY" Secure="yes" Hidden="yes" />
-    <Property Id="SAVED_TEAMKEY" Secure="yes" Hidden="yes">
-      <RegistrySearch Id="SavedTeamKey" Root="HKLM" Key="SOFTWARE\Neurolito\Agent" Name="Tharga:Communication:ApiKey" Type="raw" Bitness="always64" />
-    </Property>
-    <SetProperty Action="KeepTeamKey" Id="TEAMKEY" Value="[SAVED_TEAMKEY]" After="AppSearch" Condition="NOT TEAMKEY AND SAVED_TEAMKEY" Sequence="both" />
 
     <Property Id="ENERGYMODE" Secure="yes" />
     <Property Id="SAVED_ENERGYMODE" Secure="yes">
@@ -47,7 +47,7 @@
     <!-- Make the Neurolito screensaver the installing user's own, starting after 10 minutes. Never for other users. -->
     <Property Id="SETSCREENSAVER" Value="1" Secure="yes" />
 
-    <Launch Condition="Installed OR TEAMKEY OR SAVED_TEAMKEY OR UILevel &gt;= 4"
+    <Launch Condition="Installed OR TEAMKEY OR WIX_UPGRADE_DETECTED OR UILevel &gt;= 4"
             Message="The Neurolito Agent needs your team's install key: msiexec /i NeurolitoAgent.msi TEAMKEY=&lt;key&gt;. The install page on neurolito.com shows it." />
 
     <!-- On a full uninstall, the data folder goes too - models, logs. Not on an upgrade, which uninstalls the old version first. -->
@@ -59,6 +59,7 @@
       <ComponentGroupRef Id="LlamaFiles" />
       <ComponentRef Id="AgentService" />
       <ComponentRef Id="Settings" />
+      <ComponentRef Id="TeamKey" />
       <ComponentRef Id="ServerAddress" />
       <ComponentRef Id="DataFolder" />
       <ComponentRef Id="Screensaver" />
@@ -79,6 +80,7 @@
       <Directory Id="DataFolder" Name="Neurolito">
         <Directory Id="ModelsFolder" Name="models" />
         <Directory Id="LogsFolder" Name="logs" />
+        <Directory Id="SettingsFolder" Name="settings" />
       </Directory>
     </StandardDirectory>
 
@@ -111,16 +113,10 @@
       <ServiceControl Id="AgentService" Name="NeurolitoAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
     </Component>
 
-    <!--
-      The agent's settings, read by the agent from this key. Readable by the service and administrators only, since the
-      team key is a credential. The account is given by its SID - S-1-5-80 and the SHA-1 of NEUROLITOAGENT - because the
-      permissions are set before the service, and with it the account, exists.
-    -->
+    <!-- The agent's settings, read by the agent from this key. None of them is a secret; the team key is not here. -->
     <Component Id="Settings" Directory="INSTALLFOLDER" Guid="32951121-b444-4bc7-aa9d-6351890ae84d">
-      <RegistryKey Root="HKLM" Key="SOFTWARE\Neurolito\Agent" ForceCreateOnInstall="yes">
-        <PermissionEx Sddl="D:PAI(A;CI;KA;;;SY)(A;CI;KA;;;BA)(A;CI;KR;;;S-1-5-80-3971261960-1095350057-3374866757-4235053908-3398681378)" />
-        <RegistryValue Name="Tharga:Communication:ApiKey" Value="[TEAMKEY]" Type="string" KeyPath="yes" />
-        <RegistryValue Name="Engine:Kind" Value="LlamaServer" Type="string" />
+      <RegistryKey Root="HKLM" Key="SOFTWARE\Neurolito\Agent">
+        <RegistryValue Name="Engine:Kind" Value="LlamaServer" Type="string" KeyPath="yes" />
         <RegistryValue Name="LlamaServer:ExecutablePath" Value="[LlamaFolder]llama-server.exe" Type="string" />
         <RegistryValue Name="LlamaServer:ModelsPath" Value="[ModelsFolder]" Type="string" />
         <RegistryValue Name="Desktop:Enabled" Value="true" Type="string" />
@@ -140,6 +136,21 @@
         <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-80-3971261960-1095350057-3374866757-4235053908-3398681378)(A;OICI;0x1200a9;;;BU)" />
       </CreateFolder>
       <util:RemoveFolderEx On="uninstall" Property="DATAFOLDER_TO_REMOVE" />
+    </Component>
+
+    <!--
+      The team key, a credential, in ProgramData\Neurolito\settings\agent.ini, which only the service and administrators
+      can read. A file rather than a registry value, because Windows Installer applies a folder's permissions when it
+      creates the folder, and a registry key's only in a case that a key with values never is. The service account is
+      given by its SID - S-1-5-80 and the SHA-1 of NEUROLITOAGENT - because the permissions are set before the service,
+      and with it the account, exists. Permanent and written only when a key is given, so an upgrade keeps it; a full
+      uninstall removes it with the data folder.
+    -->
+    <Component Id="TeamKey" Directory="SettingsFolder" Guid="7c0b3f6e-2a51-4c1e-9d8f-3b6a2e4f1c90" Permanent="yes" Condition="TEAMKEY">
+      <CreateFolder>
+        <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;S-1-5-80-3971261960-1095350057-3374866757-4235053908-3398681378)" />
+      </CreateFolder>
+      <IniFile Id="TeamKey" Action="addLine" Directory="SettingsFolder" Name="agent.ini" Section="Tharga:Communication" Key="ApiKey" Value="[TEAMKEY]" />
     </Component>
 
     <!-- In System32, which is where the screen saver settings look. Windows may start it by its short name. -->
