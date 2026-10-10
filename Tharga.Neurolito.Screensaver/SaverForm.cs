@@ -14,6 +14,12 @@ internal sealed class SaverForm : Form
     private const int WsVisible = 0x10000000;
     private const int MouseSlack = 10;
 
+    /// <summary>
+    /// Input in the first moment does not count: the key that started the screensaver from a prompt is still down and
+    /// repeating, and a window appearing gets a mouse move of its own. Without this it ended as it opened.
+    /// </summary>
+    private static readonly TimeSpan Grace = TimeSpan.FromSeconds(1.5);
+
     private static readonly Color Background = Color.Black;
     private static readonly Color Title = Color.White;
     private static readonly Color Quiet = Color.FromArgb(140, 140, 150);
@@ -43,12 +49,19 @@ internal sealed class SaverForm : Form
         ShowInTaskbar = false;
         KeyPreview = true;
         Cursor.Hide();
-        KeyDown += (_, _) => Close();
-        MouseDown += (_, _) => Close();
+        var shown = DateTime.UtcNow;
+        bool Settled() => DateTime.UtcNow - shown > Grace;
+        KeyDown += (_, _) => { if (Settled()) Close(); };
+        MouseDown += (_, _) => { if (Settled()) Close(); };
         MouseMove += (_, e) =>
         {
-            //NOTE: Windows sends a move when the window appears; only a real move ends the screensaver.
-            _firstMouse ??= e.Location;
+            //NOTE: Measured from where the mouse was once the screensaver settled; only a real move ends it.
+            if (!Settled() || _firstMouse == null)
+            {
+                _firstMouse = e.Location;
+                return;
+            }
+
             if (Math.Abs(e.X - _firstMouse.Value.X) + Math.Abs(e.Y - _firstMouse.Value.Y) > MouseSlack) Close();
         };
     }
