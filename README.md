@@ -39,8 +39,32 @@ ready for work. The default is never: installing the agent does not change how y
 |---|---|
 | `Tharga.Neurolito.Screensaver` | The screensaver (`Neurolito.scr`) |
 | `Tharga.Neurolito.Screensaver.Tests` | Its tests |
+| `Tharga.Neurolito.Installer` | The MSI ([WiX](https://wixtoolset.org) v5) |
+| `build/build.ps1` | Builds the MSI: publishes the agent, the screensaver and a pinned, checksum-verified llama.cpp, then the installer |
 
-The installer and the release build follow.
+## Installing
+
+Run `NeurolitoAgent.msi` and enter your team's install key. Or, for many machines:
+
+```powershell
+msiexec /i NeurolitoAgent.msi /qn TEAMKEY=<key> ENERGYMODE=WhileReady SETSCREENSAVER=0
+```
+
+| Property | |
+|---|---|
+| `TEAMKEY` | Your team's install key. Required on a first install; kept on upgrade. |
+| `ENERGYMODE` | `Never` (default), `WhileWorking` or `WhileReady`. Kept on upgrade. |
+| `SETSCREENSAVER` | `1` (default) makes the Neurolito screensaver the installing user's, starting after 10 minutes. `0` leaves it alone. |
+| `SERVERADDRESS` | For testing against another Neurolito server only. |
+
+What goes where:
+
+- `C:\Program Files\Neurolito Agent` - the agent and llama.cpp. The service is `NeurolitoAgent`, running as `NT SERVICE\NeurolitoAgent`.
+- `C:\ProgramData\Neurolito` - models and logs, writable by the service only.
+- `C:\Windows\System32\Neurolito.scr` - the screensaver.
+- `HKLM\SOFTWARE\Neurolito\Agent` - the agent's settings, readable by the service and administrators only.
+
+Uninstalling removes all of it, models included.
 
 ## Building from source
 
@@ -50,6 +74,14 @@ You need Windows and the [.NET 10 SDK](https://dotnet.microsoft.com/download).
 dotnet build Tharga.Neurolito.Windows.slnx -c Release
 dotnet test Tharga.Neurolito.Windows.slnx -c Release
 ```
+
+The MSI, from a checkout of [`neurolito-agent`](https://github.com/Neurolito/neurolito-agent) next to this one:
+
+```powershell
+./build/build.ps1 -AgentProject ../neurolito-agent/Tharga.Neurolito.Agent/Tharga.Neurolito.Agent.csproj -Version 0.1.0
+```
+
+It lands in `artifacts/msi`.
 
 To try the screensaver without installing it, run `Neurolito.exe /s` from the build output (any key or mouse movement
 ends it), or `/p 0` for nothing. With no agent running it says so; with an agent running in desktop mode
