@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path="README.md" />
+    <File Path="CONTRIBUTING.md" />
+    <File Path="SECURITY.md" />
+  </Folder>
+  <Project Path="Tharga.Neurolito.Screensaver/Tharga.Neurolito.Screensaver.csproj" />
+  <Project Path="Tharga.Neurolito.Screensaver.Tests/Tharga.Neurolito.Screensaver.Tests.csproj" />
+</Solution>
