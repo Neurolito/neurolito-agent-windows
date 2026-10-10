@@ -1,0 +1,40 @@
+name: Bug report
+description: Something in the Windows installer or the screensaver does not work as it should
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Apps & features lists it under Neurolito Agent.
+    validations:
+      required: true
+  - type: dropdown
+    id: part
+    attributes:
+      label: Which part
+      options:
+        - Installing, upgrading or uninstalling
+        - The screensaver
+        - The agent service (starting, stopping, sleep)
+        - Something else
+    validations:
+      required: true
+  - type: input
+    id: machine
+    attributes:
+      label: Windows version and graphics card
+      placeholder: e.g. Windows 11 24H2, NVIDIA RTX 4070
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: The agent's log around the problem. Remove your install key and anything else private.
+      render: text

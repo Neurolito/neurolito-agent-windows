@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Installing an agent
+    url: https://neurolito.com/install-agent
+    about: The install guide shows the route that fits your machine, with the commands filled in.
+  - name: Something in the agent itself
+    url: https://github.com/Neurolito/neurolito-agent/issues
+    about: The agent - models, jobs, the connection to Neurolito - lives in neurolito-agent.
+  - name: Report a security problem
+    url: https://github.com/Neurolito/neurolito-agent-windows/security/advisories/new
+    about: Report vulnerabilities privately, never in a public issue.
