@@ -151,12 +151,14 @@ internal sealed class SaverForm : Form
         DrawAnswer(g, frame, w * 0.47f, w - margin, top, bottom);
 
         if (frame.Totals != null) Line(g, frame.Totals, _fonts.Small, Quiet, 0.8f, margin, h - margin);
+        if (frame.Version != null) Line(g, frame.Version, _fonts.Small, Quiet, 0.6f, w - margin - TextWidth(g, frame.Version, _fonts.Small), h - margin);
     }
 
     private void DrawPreview(Graphics g, SceneFrame frame)
     {
         var y = Line(g, "Neurolito", _fonts.Title, Title, 1, 4, 4);
-        Line(g, frame.Status, _fonts.Small, StatusColor(frame), 1, 4, y + 2);
+        y = Line(g, frame.Status, _fonts.Small, StatusColor(frame), 1, 4, y + 2);
+        if (frame.Version != null) Line(g, frame.Version, _fonts.Small, Quiet, 1, 4, y);
     }
 
     /// <summary>The prompt, flying in from the left edge and fading as it lands mid-screen.</summary>
