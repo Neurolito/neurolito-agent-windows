@@ -143,12 +143,20 @@ internal sealed class SaverForm : Form
         if (frame.Connected) y = Line(g, string.Join("  ·  ", new[] { frame.Machine, frame.Engine }.Where(s => !string.IsNullOrEmpty(s))), _fonts.Small, Quiet, 1, x, y);
         y = Line(g, frame.Status, _fonts.Status, StatusColor(frame), 1, x, y + h * 0.01f);
         if (!string.IsNullOrEmpty(frame.Model)) y = Line(g, frame.Model, _fonts.Small, Quiet, 1, x, y);
+        //NOTE: A model loading is the long wait before a job's first word; it breathes so the screen does not look stuck.
+        if (frame.ModelActivity != null) y = Line(g, frame.ModelActivity, _fonts.Small, Working, 0.55f + 0.45f * (float)Math.Abs(Math.Sin(now.TotalSeconds * 2)), x, y);
+        else if (frame.ModelNote != null && frame.ModelNoteAlpha > 0) y = Line(g, frame.ModelNote, _fonts.Small, Quiet, frame.ModelNoteAlpha, x, y);
+        else if (frame.InMemory != null) y = Line(g, frame.InMemory, _fonts.Small, Quiet, 0.7f, x, y);
         if (frame.Summary != null && frame.SummaryAlpha > 0) Line(g, frame.Summary, _fonts.Small, Quiet, frame.SummaryAlpha, x, y + h * 0.01f);
 
-        var top = h * 0.32f;
+        DrawWork(g, frame, w * 0.40f + _drift.X, margin + _drift.Y, w * 0.22f, h);
+        DrawQueue(g, frame, w - margin + _drift.X, margin + _drift.Y, h);
+
+        var top = h * TrafficScene.LanesTop;
         var bottom = h - margin * 1.6f;
         DrawIncoming(g, frame, w, top, bottom);
-        DrawAnswer(g, frame, w * 0.47f, w - margin, top, bottom);
+        DrawSwirl(g, frame, w, h);
+        DrawAnswer(g, frame, w * TrafficScene.AnswerX, w - margin, top, bottom);
 
         if (frame.Totals != null) Line(g, frame.Totals, _fonts.Small, Quiet, 0.8f, margin, h - margin);
         if (frame.Version != null) Line(g, frame.Version, _fonts.Small, Quiet, 0.6f, w - margin - TextWidth(g, frame.Version, _fonts.Small), h - margin);
@@ -177,6 +185,61 @@ internal sealed class SaverForm : Form
             using var brush = new SolidBrush(Fade(Incoming, alpha));
             g.DrawString(word.Text, _fonts.Word, brush, x, y, StringFormat.GenericTypographic);
         }
+    }
+
+    /// <summary>The prompt's letters while the model reads it, turning between the prompt and the answer, then joining the answer.</summary>
+    private void DrawSwirl(Graphics g, SceneFrame frame, float width, float height)
+    {
+        foreach (var letter in frame.Swirl)
+        {
+            using var brush = new SolidBrush(Fade(Mix(Incoming, Answer, letter.Arrival), letter.Alpha));
+            g.DrawString(letter.Letter.ToString(), _fonts.Word, brush, letter.X * width, letter.Y * height, StringFormat.GenericTypographic);
+        }
+    }
+
+    /// <summary>Today's work units and jobs over a bar for each of the last 24 hours, the current hour lit.</summary>
+    private void DrawWork(Graphics g, SceneFrame frame, float left, float top, float width, float height)
+    {
+        if (frame.WorkToday == null) return;
+
+        var y = Line(g, frame.WorkToday, _fonts.Status, Title, 0.9f, left, top);
+        var hours = frame.WorkHours;
+        var chartHeight = height * 0.08f;
+        var chartTop = y + height * 0.008f;
+        var max = hours.Count == 0 ? 0 : hours.Max();
+        if (hours.Count > 0)
+        {
+            var slot = width / hours.Count;
+            for (var i = 0; i < hours.Count; i++)
+            {
+                var barHeight = max <= 0 ? 0 : (float)(hours[i] / max) * chartHeight;
+                var current = i == hours.Count - 1;
+                using var brush = new SolidBrush(Fade(current ? Ready : Incoming, current ? 0.9f : 0.55f));
+                //NOTE: An hour without work keeps a hairline, so the chart reads as 24 hours rather than a gap.
+                g.FillRectangle(brush, left + i * slot, chartTop + chartHeight - Math.Max(1, barHeight), Math.Max(1, slot * 0.7f), Math.Max(1, barHeight));
+            }
+        }
+
+        Line(g, $"Last 24 hours · {frame.WorkWeek}", _fonts.Small, Quiet, 0.8f, left, chartTop + chartHeight + height * 0.006f);
+    }
+
+    /// <summary>The jobs this machine can take now, and those waiting for a model it lacks, right-aligned.</summary>
+    private void DrawQueue(Graphics g, SceneFrame frame, float right, float top, float height)
+    {
+        if (frame.Queue is not { } queue) return;
+
+        var y = RightLine(g, $"{queue.Pickable:N0}", _fonts.Title, queue.Pickable > 0 ? Ready : Quiet, 1, right, top);
+        y = RightLine(g, queue.Pickable == 1 ? "job this machine can take" : "jobs this machine can take", _fonts.Small, Quiet, 0.9f, right, y);
+        if (queue.Unpickable == 0) return;
+
+        y = RightLine(g, $"{queue.Unpickable:N0} waiting for a model it does not have", _fonts.Status, Working, 0.9f, right, y + height * 0.012f);
+        foreach (var (model, jobs) in queue.Missing.Take(3)) y = RightLine(g, $"{model} · {jobs:N0}", _fonts.Small, Quiet, 0.8f, right, y);
+    }
+
+    private float RightLine(Graphics g, string text, Font font, Color color, float alpha, float right, float y)
+    {
+        if (string.IsNullOrEmpty(text)) return y;
+        return Line(g, text, font, color, alpha, right - g.MeasureString(text, font).Width, y);
     }
 
     /// <summary>The answer, a paragraph that grows word by word; when it fills its column the oldest lines scroll away.</summary>
@@ -257,6 +320,13 @@ internal sealed class SaverForm : Form
         : Quiet;
 
     private static Color Fade(Color color, float alpha) => Color.FromArgb((int)(Math.Clamp(alpha, 0, 1) * 255), color);
+
+    private static Color Mix(Color from, Color to, float share)
+    {
+        share = Math.Clamp(share, 0, 1);
+        int Channel(int a, int b) => (int)(a + (b - a) * share);
+        return Color.FromArgb(Channel(from.R, to.R), Channel(from.G, to.G), Channel(from.B, to.B));
+    }
 
     protected override void OnFormClosed(FormClosedEventArgs e)
     {
