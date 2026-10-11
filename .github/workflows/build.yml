@@ -41,6 +41,7 @@ jobs:
         run: ./build/build.ps1 -AgentProject agent-source/Tharga.Neurolito.Agent/Tharga.Neurolito.Agent.csproj -Version "0.0.${{ github.run_number }}"
       - uses: actions/upload-artifact@v4
         with:
+          if-no-files-found: warn
           name: neurolito-agent-windows-0.0.${{ github.run_number }}
           path: |
             artifacts/msi/NeurolitoAgent.msi

@@ -46,11 +46,8 @@ dotnet publish $AgentProject -c Release -r win-x64 --self-contained -o $stage -p
 Check 'Publishing the agent'
 # Development settings are for a developer's machine, not an installed agent.
 Get-ChildItem $stage -Filter 'appsettings.Development.json' | Remove-Item
-if (-not (Test-Path (Join-Path $stage 'Velopack.dll'))) {
-    $message = 'This agent cannot update itself: it was built without Velopack.'
-    if ($RequireUpdater) { throw "$message A release needs an agent that can." }
-    Write-Warning "$message Fine for a trial build, not for a release."
-}
+$canUpdate = Test-Path (Join-Path $stage 'Velopack.dll')
+if (-not $canUpdate -and $RequireUpdater) { throw 'This agent cannot update itself: it was built without Velopack. A release needs an agent that can.' }
 
 Step 'Screensaver'
 dotnet publish (Join-Path $root 'Tharga.Neurolito.Screensaver') -c Release -r win-x64 --self-contained -o (Join-Path $stage 'screensaver') `
@@ -87,6 +84,13 @@ Get-ChildItem $unpacked -File | Where-Object {
 $license = Join-Path $cache "LICENSE-llama.cpp-$($llama.build)"
 if (-not (Test-Path $license)) { Invoke-WebRequest "https://raw.githubusercontent.com/ggml-org/llama.cpp/$($llama.build)/LICENSE" -OutFile $license }
 Copy-Item $license (Join-Path $llamaDir 'LICENSE-llama.cpp')
+
+if (-not $canUpdate) {
+    # Velopack will not pack an agent that does not start it, and an installer without the package is not one this
+    # repository makes. A trial build of such an agent stops here, having built and checked everything before.
+    Write-Warning 'This agent cannot update itself (no Velopack), so there is no package and no MSI. Everything before built.'
+    return
+}
 
 Step "Velopack package $Version"
 New-Item -ItemType Directory $releases -Force | Out-Null
