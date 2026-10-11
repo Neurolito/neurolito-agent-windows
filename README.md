@@ -47,14 +47,15 @@ ready for work. The default is never: installing the agent does not change how y
 Run `NeurolitoAgent.msi` and enter your team's install key. Or, for many machines:
 
 ```powershell
-msiexec /i NeurolitoAgent.msi /qn TEAMKEY=<key> ENERGYMODE=WhileReady SETSCREENSAVER=0
+msiexec /i NeurolitoAgent.msi /qn TEAMKEY=<key> ENERGYMODE=WhileReady SCREENSAVERMINUTES=5
 ```
 
 | Property | |
 |---|---|
 | `TEAMKEY` | Your team's install key. Required on a first install; kept on upgrade. |
 | `ENERGYMODE` | `Never` (default), `WhileWorking` or `WhileReady`. Kept on upgrade. |
-| `SETSCREENSAVER` | `1` (default) makes the Neurolito screensaver the installing user's, starting after 10 minutes. `0` leaves it alone. |
+| `SETSCREENSAVER` | `1` (default) makes the Neurolito screensaver the installing user's. `0` leaves it alone. |
+| `SCREENSAVERMINUTES` | How long the computer is idle before the screensaver starts, and so before the agent may work: `1`, `2`, `3`, `5`, `10` (default), `15`, `20`, `30`, `45` or `60`. Kept on upgrade. |
 | `SERVERADDRESS` | For testing against another Neurolito server only. |
 
 What goes where:
