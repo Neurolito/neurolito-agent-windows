@@ -13,7 +13,7 @@ jobs:
   release:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Version from the tag
         shell: pwsh
         run: |
@@ -26,7 +26,7 @@ jobs:
           $agent = Get-Content build/agent.json -Raw | ConvertFrom-Json
           git clone --quiet "https://github.com/$($agent.repository).git" agent-source
           git -C agent-source checkout --quiet $agent.ref
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
       - run: dotnet tool install -g vpk --version 1.2.161
