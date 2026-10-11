@@ -1,0 +1,85 @@
+using System.Diagnostics;
+using System.Runtime.InteropServices;
+using Microsoft.Win32;
+using Microsoft.Win32.SafeHandles;
+
+// Windows starts this as the screensaver (Neurolito.scr in System32). It starts the real screensaver, which is updated
+// with the agent, from the agent's install folder - passing on /s, /p <window> or /c as they came - and ends with it.
+
+var folder = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Neurolito\Agent")?.GetValue("InstallFolder") as string;
+var screensaver = folder == null ? null : Path.Combine(folder, "current", "screensaver", "Neurolito.exe");
+if (screensaver == null || !File.Exists(screensaver)) return 1;
+
+var start = new ProcessStartInfo(screensaver) { UseShellExecute = false };
+foreach (var argument in args) start.ArgumentList.Add(argument);
+
+using var process = Process.Start(start);
+if (process == null) return 1;
+
+//NOTE: Tied to this process, so a screensaver Windows ends by ending the launcher does not stay behind on the screen.
+Job.Add(process);
+process.WaitForExit();
+return process.ExitCode;
+
+internal static class Job
+{
+    private const int ExtendedLimitInformation = 9;
+    private const uint KillOnJobClose = 0x2000;
+    private static SafeFileHandle _job;
+
+    public static void Add(Process process)
+    {
+        _job = CreateJobObject(IntPtr.Zero, null);
+        if (_job.IsInvalid) return;
+
+        var info = new ExtendedLimit { Basic = new BasicLimit { LimitFlags = KillOnJobClose } };
+        var size = Marshal.SizeOf<ExtendedLimit>();
+        var pointer = Marshal.AllocHGlobal(size);
+        try
+        {
+            Marshal.StructureToPtr(info, pointer, false);
+            if (SetInformationJobObject(_job, ExtendedLimitInformation, pointer, (uint)size)) AssignProcessToJobObject(_job, process.Handle);
+        }
+        finally
+        {
+            Marshal.FreeHGlobal(pointer);
+        }
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern SafeFileHandle CreateJobObject(IntPtr attributes, string name);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetInformationJobObject(SafeFileHandle job, int infoClass, IntPtr info, uint length);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AssignProcessToJobObject(SafeFileHandle job, IntPtr process);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct BasicLimit
+    {
+        public long PerProcessUserTimeLimit;
+        public long PerJobUserTimeLimit;
+        public uint LimitFlags;
+        public UIntPtr MinimumWorkingSetSize;
+        public UIntPtr MaximumWorkingSetSize;
+        public uint ActiveProcessLimit;
+        public UIntPtr Affinity;
+        public uint PriorityClass;
+        public uint SchedulingClass;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct IoCounters
+    {
+        public ulong ReadOperationCount, WriteOperationCount, OtherOperationCount, ReadTransferCount, WriteTransferCount, OtherTransferCount;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct ExtendedLimit
+    {
+        public BasicLimit Basic;
+        public IoCounters Io;
+        public UIntPtr ProcessMemoryLimit, JobMemoryLimit, PeakProcessMemoryUsed, PeakJobMemoryUsed;
+    }
+}

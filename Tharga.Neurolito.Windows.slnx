@@ -6,4 +6,5 @@
   </Folder>
   <Project Path="Tharga.Neurolito.Screensaver/Tharga.Neurolito.Screensaver.csproj" />
   <Project Path="Tharga.Neurolito.Screensaver.Tests/Tharga.Neurolito.Screensaver.Tests.csproj" />
+  <Project Path="Tharga.Neurolito.ScreensaverLauncher/Tharga.Neurolito.ScreensaverLauncher.csproj" />
 </Solution>

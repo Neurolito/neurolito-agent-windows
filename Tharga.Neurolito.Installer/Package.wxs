@@ -5,9 +5,14 @@
     The Neurolito Agent for Windows: the agent as a Windows service, llama.cpp for it to run models with, and the
     screensaver. Per machine, into Program Files; its data (models, logs) in ProgramData\Neurolito.
 
+    The files are a Velopack package's portable layout - Update.exe, and the release in current\ - so the agent updates
+    itself after this installs it: its service account may write the install folder, and Velopack replaces current\.
+    This installer therefore installs the first version and the service, and removes them; it does not repair, which
+    would put the first version back.
+
     Silent install:
       msiexec /i NeurolitoAgent.msi /qn TEAMKEY=<key> [ENERGYMODE=Never|WhileWorking|WhileReady] [SETSCREENSAVER=0]
-    TEAMKEY, ENERGYMODE and SERVERADDRESS are kept on upgrade when not given again.
+    TEAMKEY, ENERGYMODE, SERVERADDRESS and UPDATESOURCE are kept on upgrade when not given again.
   -->
   <Package Name="Neurolito Agent" Manufacturer="Neurolito" Version="$(var.Version)"
            UpgradeCode="bd2bbd7b-e529-4825-86dd-d5f6f3008183" Scope="perMachine" Compressed="yes">
@@ -19,6 +24,7 @@
     <Property Id="ARPURLINFOABOUT" Value="https://neurolito.com" />
     <Property Id="ARPHELPLINK" Value="https://github.com/Neurolito/neurolito-agent-windows" />
     <Property Id="ARPNOMODIFY" Value="1" />
+    <Property Id="ARPNOREPAIR" Value="1" />
 
     <!--
       The team key is written to a file only the service and administrators can read, and only when one is given: an
@@ -44,19 +50,33 @@
     </Property>
     <SetProperty Action="KeepServerAddress" Id="SERVERADDRESS" Value="[SAVED_SERVERADDRESS]" After="AppSearch" Condition="NOT SERVERADDRESS AND SAVED_SERVERADDRESS" Sequence="both" />
 
+    <!-- Where updates come from: this repository's releases, or a folder or web address for testing. -->
+    <Property Id="UPDATESOURCE" Secure="yes" />
+    <Property Id="SAVED_UPDATESOURCE" Secure="yes">
+      <RegistrySearch Id="SavedUpdateSource" Root="HKLM" Key="SOFTWARE\Neurolito\Agent" Name="Updates:Source" Type="raw" Bitness="always64" />
+    </Property>
+    <SetProperty Action="KeepUpdateSource" Id="UPDATESOURCE" Value="[SAVED_UPDATESOURCE]" After="AppSearch" Condition="NOT UPDATESOURCE AND SAVED_UPDATESOURCE" Sequence="both" />
+    <SetProperty Action="DefaultUpdateSource" Id="UPDATESOURCE" Value="https://github.com/Neurolito/neurolito-agent-windows" After="KeepUpdateSource" Condition="NOT UPDATESOURCE" Sequence="both" />
+
     <!-- Make the Neurolito screensaver the installing user's own, starting after 10 minutes. Never for other users. -->
     <Property Id="SETSCREENSAVER" Value="1" Secure="yes" />
 
     <Launch Condition="Installed OR TEAMKEY OR WIX_UPGRADE_DETECTED OR UILevel &gt;= 4"
             Message="The Neurolito Agent needs your team's install key: msiexec /i NeurolitoAgent.msi TEAMKEY=&lt;key&gt;. The install page on neurolito.com shows it." />
 
-    <!-- On a full uninstall, the data folder goes too - models, logs. Not on an upgrade, which uninstalls the old version first. -->
+    <!--
+      On a full uninstall, the data folder goes too - models, logs - and everything in the install folder, including the
+      versions Velopack added after this installed the first. Not on an upgrade, which uninstalls the old version first.
+    -->
     <SetProperty Action="RemoveDataOnUninstall" Id="DATAFOLDER_TO_REMOVE" Value="[DataFolder]" Before="CostInitialize"
+                 Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" Sequence="execute" />
+    <SetProperty Action="RemoveInstallOnUninstall" Id="INSTALLFOLDER_TO_REMOVE" Value="[INSTALLFOLDER]" Before="CostInitialize"
                  Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" Sequence="execute" />
 
     <Feature Id="Agent" Title="Neurolito Agent" Level="1" AllowAbsent="no">
-      <ComponentGroupRef Id="AgentFiles" />
-      <ComponentGroupRef Id="LlamaFiles" />
+      <ComponentGroupRef Id="AgentRoot" />
+      <ComponentGroupRef Id="AgentCurrent" />
+      <ComponentRef Id="InstallFolder" />
       <ComponentRef Id="AgentService" />
       <ComponentRef Id="Settings" />
       <ComponentRef Id="TeamKey" />
@@ -72,7 +92,7 @@
   <Fragment>
     <StandardDirectory Id="ProgramFiles64Folder">
       <Directory Id="INSTALLFOLDER" Name="Neurolito Agent">
-        <Directory Id="LlamaFolder" Name="llama" />
+        <Directory Id="CurrentFolder" Name="current" />
       </Directory>
     </StandardDirectory>
 
@@ -88,27 +108,43 @@
   </Fragment>
 
   <Fragment>
-    <ComponentGroup Id="AgentFiles" Directory="INSTALLFOLDER">
-      <Files Include="$(var.AgentDir)\**">
-        <Exclude Files="$(var.AgentDir)\Tharga.Neurolito.Agent.exe" />
+    <!-- Velopack's own files at the root: Update.exe, its launcher and the portable marker. -->
+    <ComponentGroup Id="AgentRoot" Directory="INSTALLFOLDER">
+      <Files Include="$(var.AgentDir)\*" />
+    </ComponentGroup>
+
+    <!-- The release: the agent, llama.cpp in llama\, the screensaver in screensaver\. -->
+    <ComponentGroup Id="AgentCurrent" Directory="CurrentFolder">
+      <Files Include="$(var.AgentDir)\current\**">
+        <Exclude Files="$(var.AgentDir)\current\Tharga.Neurolito.Agent.exe" />
       </Files>
     </ComponentGroup>
 
-    <ComponentGroup Id="LlamaFiles" Directory="LlamaFolder">
-      <Files Include="$(var.LlamaDir)\**" />
-    </ComponentGroup>
+    <!--
+      The install folder: the service may change it, to update itself; users may read it, since the screensaver they run
+      is in it. Set as it is created, so every file installed into it inherits this. The service account is given by its
+      SID - S-1-5-80 and the SHA-1 of NEUROLITOAGENT - because the permissions are set before the service exists.
+    -->
+    <Component Id="InstallFolder" Directory="INSTALLFOLDER" Guid="1f4e8a2b-6c3d-4e5f-8a9b-0c1d2e3f4a5b">
+      <CreateFolder>
+        <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-80-3971261960-1095350057-3374866757-4235053908-3398681378)(A;OICI;0x1200a9;;;BU)" />
+      </CreateFolder>
+      <util:RemoveFolderEx On="uninstall" Property="INSTALLFOLDER_TO_REMOVE" />
+    </Component>
 
     <!--
       The service runs as its own virtual account, NT SERVICE\NeurolitoAgent: least privilege, and the GPU works from it
-      as from any account. Restarted if it stops.
+      as from any account. It points into current\, which keeps its name across updates. Restarted if it stops, after
+      30 s - which is also how an update finishes: the agent hands over to Update.exe and exits, and is started again on
+      the new files.
     -->
-    <Component Id="AgentService" Directory="INSTALLFOLDER">
-      <File Id="AgentExe" Source="$(var.AgentDir)\Tharga.Neurolito.Agent.exe" KeyPath="yes" />
+    <Component Id="AgentService" Directory="CurrentFolder">
+      <File Id="AgentExe" Source="$(var.AgentDir)\current\Tharga.Neurolito.Agent.exe" KeyPath="yes" />
       <ServiceInstall Id="AgentService" Name="NeurolitoAgent" DisplayName="Neurolito Agent"
                       Description="Runs language models for your Neurolito team while nobody is using this machine."
                       Type="ownProcess" Start="auto" ErrorControl="normal" Account="NT SERVICE\NeurolitoAgent" Vital="yes">
         <util:ServiceConfig FirstFailureActionType="restart" SecondFailureActionType="restart" ThirdFailureActionType="restart"
-                            RestartServiceDelayInSeconds="10" ResetPeriodInDays="1" />
+                            RestartServiceDelayInSeconds="30" ResetPeriodInDays="1" />
       </ServiceInstall>
       <ServiceControl Id="AgentService" Name="NeurolitoAgent" Start="install" Stop="both" Remove="uninstall" Wait="yes" />
     </Component>
@@ -117,10 +153,13 @@
     <Component Id="Settings" Directory="INSTALLFOLDER" Guid="32951121-b444-4bc7-aa9d-6351890ae84d">
       <RegistryKey Root="HKLM" Key="SOFTWARE\Neurolito\Agent">
         <RegistryValue Name="Engine:Kind" Value="LlamaServer" Type="string" KeyPath="yes" />
-        <RegistryValue Name="LlamaServer:ExecutablePath" Value="[LlamaFolder]llama-server.exe" Type="string" />
+        <RegistryValue Name="InstallFolder" Value="[INSTALLFOLDER]" Type="string" />
+        <RegistryValue Name="LlamaServer:ExecutablePath" Value="[CurrentFolder]llama\llama-server.exe" Type="string" />
         <RegistryValue Name="LlamaServer:ModelsPath" Value="[ModelsFolder]" Type="string" />
         <RegistryValue Name="Desktop:Enabled" Value="true" Type="string" />
         <RegistryValue Name="Desktop:EnergyMode" Value="[ENERGYMODE]" Type="string" />
+        <RegistryValue Name="Updates:Enabled" Value="true" Type="string" />
+        <RegistryValue Name="Updates:Source" Value="[UPDATESOURCE]" Type="string" />
         <RegistryValue Name="Urls" Value="http://127.0.0.1:5180" Type="string" />
         <RegistryValue Name="Serilog:WriteTo:1:Args:path" Value="[LogsFolder]agent-.log" Type="string" />
       </RegistryKey>
@@ -141,10 +180,8 @@
     <!--
       The team key, a credential, in ProgramData\Neurolito\settings\agent.ini, which only the service and administrators
       can read. A file rather than a registry value, because Windows Installer applies a folder's permissions when it
-      creates the folder, and a registry key's only in a case that a key with values never is. The service account is
-      given by its SID - S-1-5-80 and the SHA-1 of NEUROLITOAGENT - because the permissions are set before the service,
-      and with it the account, exists. Permanent and written only when a key is given, so an upgrade keeps it; a full
-      uninstall removes it with the data folder.
+      creates the folder, and a registry key's only in a case that a key with values never is. Permanent and written only
+      when a key is given, so an upgrade keeps it; a full uninstall removes it with the data folder.
     -->
     <Component Id="TeamKey" Directory="SettingsFolder" Guid="7c0b3f6e-2a51-4c1e-9d8f-3b6a2e4f1c90" Permanent="yes" Condition="TEAMKEY">
       <CreateFolder>
@@ -153,7 +190,10 @@
       <IniFile Id="TeamKey" Action="addLine" Directory="SettingsFolder" Name="agent.ini" Section="Tharga:Communication" Key="ApiKey" Value="[TEAMKEY]" />
     </Component>
 
-    <!-- In System32, which is where the screen saver settings look. Windows may start it by its short name. -->
+    <!--
+      In System32, where the screen saver settings look: a small launcher that never changes, starting the real
+      screensaver from current\, so the screensaver is updated with the agent. Windows may start it by its short name.
+    -->
     <Component Id="Screensaver" Directory="System64Folder" Guid="d8a7c199-6cf4-45c1-a4bf-ad35ac869864">
       <File Id="NeurolitoScr" Source="$(var.ScreensaverFile)" Name="Neurolito.scr" KeyPath="yes" />
     </Component>
