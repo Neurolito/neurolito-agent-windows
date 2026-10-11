@@ -50,8 +50,10 @@ Check 'Publishing the screensaver'
 
 Step 'Screensaver launcher'
 Fresh $launcherDir
+# The release's version, not its own: Windows Installer does not replace a file with one of a lower version, and an
+# upgrade from 0.1 found the old screensaver's 0.1.1 in its place, skipped the launcher and then removed the old file.
 dotnet publish (Join-Path $root 'Tharga.Neurolito.ScreensaverLauncher') -c Release -r win-x64 --self-contained -o $launcherDir `
-    -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=true -p:DebugType=none -nologo -v q
+    -p:Version=$Version -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:PublishTrimmed=true -p:DebugType=none -nologo -v q
 Check 'Publishing the launcher'
 
 $llama = Get-Content (Join-Path $PSScriptRoot 'llama.json') -Raw | ConvertFrom-Json
