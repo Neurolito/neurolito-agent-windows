@@ -91,11 +91,23 @@
     <!--
       On a full uninstall, the data folder goes too - models, logs - and everything in the install folder, including the
       versions Velopack added after this installed the first. Not on an upgrade, which uninstalls the old version first.
+
+      The paths are spelled from the system folders, not [INSTALLFOLDER] and [DataFolder]: RemoveFolderEx reads them
+      before CostInitialize, and the directories are resolved only after it, so those were empty and nothing was swept.
+      Neither folder can be chosen, so the spelling is the folder.
     -->
-    <SetProperty Action="RemoveDataOnUninstall" Id="DATAFOLDER_TO_REMOVE" Value="[DataFolder]" Before="CostInitialize"
+    <SetProperty Action="RemoveDataOnUninstall" Id="DATAFOLDER_TO_REMOVE" Value="[CommonAppDataFolder]Neurolito\" Before="CostInitialize"
                  Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" Sequence="execute" />
-    <SetProperty Action="RemoveInstallOnUninstall" Id="INSTALLFOLDER_TO_REMOVE" Value="[INSTALLFOLDER]" Before="CostInitialize"
+    <SetProperty Action="RemoveInstallOnUninstall" Id="INSTALLFOLDER_TO_REMOVE" Value="[ProgramFiles64Folder]Neurolito Agent\" Before="CostInitialize"
                  Condition="REMOVE~=&quot;ALL&quot; AND NOT UPGRADINGPRODUCTCODE" Sequence="execute" />
+
+    <!--
+      Velopack's download cache, emptied on every install, upgrade and repair. Velopack applies a package it finds there
+      when the agent starts, if it is newer - so one left from an earlier install overwrote the version just installed
+      (NEPTUNUS, 2026-10-11: 0.1.2 installed, 0.2.1 running). At worst an update is downloaded again.
+    -->
+    <SetProperty Action="ClearUpdateCache" Id="UPDATECACHE_TO_REMOVE" Value="[ProgramFiles64Folder]Neurolito Agent\packages\" Before="CostInitialize"
+                 Condition="NOT REMOVE~=&quot;ALL&quot;" Sequence="execute" />
 
     <Feature Id="Agent" Title="Neurolito Agent" Level="1" AllowAbsent="no">
       <ComponentGroupRef Id="AgentRoot" />
@@ -154,6 +166,7 @@
         <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1301bf;;;S-1-5-80-3971261960-1095350057-3374866757-4235053908-3398681378)(A;OICI;0x1200a9;;;BU)" />
       </CreateFolder>
       <util:RemoveFolderEx On="uninstall" Property="INSTALLFOLDER_TO_REMOVE" />
+      <util:RemoveFolderEx On="install" Property="UPDATECACHE_TO_REMOVE" />
     </Component>
 
     <!--
@@ -207,8 +220,12 @@
       can read. A file rather than a registry value, because Windows Installer applies a folder's permissions when it
       creates the folder, and a registry key's only in a case that a key with values never is. Permanent and written only
       when a key is given, so an upgrade keeps it; a full uninstall removes it with the data folder.
+
+      Transitive, so the condition is asked again on a repair: without it a repair, which has no key, reinstalled the
+      component and wrote ApiKey= empty, and the agent connected without its team (NEPTUNUS, 2026-10-11). Permanent keeps
+      the file when the condition turns false. A repair given TEAMKEY writes the new key.
     -->
-    <Component Id="TeamKey" Directory="SettingsFolder" Guid="7c0b3f6e-2a51-4c1e-9d8f-3b6a2e4f1c90" Permanent="yes" Condition="TEAMKEY">
+    <Component Id="TeamKey" Directory="SettingsFolder" Guid="7c0b3f6e-2a51-4c1e-9d8f-3b6a2e4f1c90" Permanent="yes" Transitive="yes" Condition="TEAMKEY">
       <CreateFolder>
         <PermissionEx Sddl="D:PAI(A;OICI;FA;;;SY)(A;OICI;FA;;;BA)(A;OICI;0x1200a9;;;S-1-5-80-3971261960-1095350057-3374866757-4235053908-3398681378)" />
       </CreateFolder>
