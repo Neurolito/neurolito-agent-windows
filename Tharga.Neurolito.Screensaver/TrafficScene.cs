@@ -22,6 +22,7 @@ internal sealed class TrafficScene
     public static readonly TimeSpan Fade = TimeSpan.FromSeconds(6);
 
     private readonly bool _screensaverRunning;
+    private readonly string _version;
     private readonly Lock _lock = new();
     private readonly Random _random;
     private readonly List<FlyingWord> _incoming = [];
@@ -44,9 +45,11 @@ internal sealed class TrafficScene
     /// True when this is the screensaver Windows started because the machine is idle; false for the preview, which
     /// runs while someone is at the machine.
     /// </param>
-    public TrafficScene(bool screensaverRunning, int seed = 0)
+    /// <param name="version">This screensaver's release, shown with the agent's so an update can be seen to have arrived.</param>
+    public TrafficScene(bool screensaverRunning, int seed = 0, string version = null)
     {
         _screensaverRunning = screensaverRunning;
+        _version = version;
         _random = new Random(seed);
         _lorem = new Lorem(seed);
     }
@@ -119,6 +122,7 @@ internal sealed class TrafficScene
                 Machine = _state?.Machine,
                 Engine = _state?.Engine,
                 Model = _state?.Model,
+                Version = Version(),
                 Incoming = _incoming
                     .Where(x => now >= x.Launch)
                     .Select(x => new FlyingWordFrame(x.Text, Clamp((float)((now - x.Launch) / Flight)), x.Lane))
@@ -156,6 +160,18 @@ internal sealed class TrafficScene
         };
     }
 
+    /// <summary>
+    /// One number when the screensaver and the agent are the same release, which they are once an update has been applied;
+    /// both while they differ - the service restarts on a new version when its running job is done.
+    /// </summary>
+    private string Version()
+    {
+        var agent = _connected ? _state?.Version : null;
+        if (string.IsNullOrEmpty(_version)) return string.IsNullOrEmpty(agent) ? null : $"Agent {agent}";
+        if (string.IsNullOrEmpty(agent) || agent == _version) return $"Version {_version}";
+        return $"Screensaver {_version} · agent {agent}";
+    }
+
     private static string Words(long count) => count == 1 ? "1 word" : $"{count:N0} words";
 
     private static float Clamp(float value) => value < 0 ? 0 : value > 1 ? 1 : value;
@@ -174,6 +190,7 @@ internal sealed record SceneFrame
     public string Machine { get; init; }
     public string Engine { get; init; }
     public string Model { get; init; }
+    public string Version { get; init; }
     public IReadOnlyList<FlyingWordFrame> Incoming { get; init; } = [];
     public IReadOnlyList<string> Answer { get; init; } = [];
     public float AnswerAlpha { get; init; }

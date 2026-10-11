@@ -22,10 +22,10 @@ public class AgentMessageTests
     [Fact]
     public void TheStateSaysWhatTheMachineIsAndWhatItRuns()
     {
-        var message = AgentMessage.Parse("""{"type":"state","presence":"Available","working":true,"machine":"DESK1","engine":"llama.cpp b11541","model":"qwen3:1.7b"}""");
+        var message = AgentMessage.Parse("""{"type":"state","presence":"Available","working":true,"machine":"DESK1","engine":"llama.cpp b11541","model":"qwen3:1.7b","version":"0.1.1"}""");
 
-        Assert.Equal((AgentMessage.State, "Available", true, "DESK1", "llama.cpp b11541", "qwen3:1.7b"),
-            (message.Kind, message.Presence, message.Working, message.Machine, message.Engine, message.Model));
+        Assert.Equal((AgentMessage.State, "Available", true, "DESK1", "llama.cpp b11541", "qwen3:1.7b", "0.1.1"),
+            (message.Kind, message.Presence, message.Working, message.Machine, message.Engine, message.Model, message.Version));
     }
 
     [Fact]
@@ -144,6 +144,30 @@ public class TrafficSceneTests
         scene.SetConnected(false);
 
         Assert.Equal("The Neurolito agent is not running on this machine.", scene.Frame(T0).Status);
+    }
+
+    [Theory]
+    [InlineData("0.1.1", null, "Version 0.1.1")]
+    [InlineData("0.1.1", "0.1.1", "Version 0.1.1")]
+    [InlineData("0.1.1", "0.1.0", "Screensaver 0.1.1 · agent 0.1.0")]
+    [InlineData(null, "0.1.0", "Agent 0.1.0")]
+    [InlineData(null, null, null)]
+    public void TheVersionShowsWhetherTheAgentHasCaughtUp(string screensaver, string agent, string expected)
+    {
+        var scene = new TrafficScene(true, version: screensaver);
+        scene.Apply(new AgentMessage { Kind = AgentMessage.State, Presence = "Available", Version = agent }, T0);
+
+        Assert.Equal(expected, scene.Frame(T0).Version);
+    }
+
+    [Fact]
+    public void ALostAgentNoLongerClaimsAVersion()
+    {
+        var scene = new TrafficScene(true, version: "0.1.1");
+        scene.Apply(new AgentMessage { Kind = AgentMessage.State, Version = "0.1.0" }, T0);
+        scene.SetConnected(false);
+
+        Assert.Equal("Version 0.1.1", scene.Frame(T0).Version);
     }
 }
 

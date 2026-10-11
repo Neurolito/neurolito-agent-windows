@@ -23,6 +23,9 @@ internal sealed record AgentMessage
     public string Engine { get; init; }
     public string Model { get; init; }
 
+    /// <summary>The agent's release, on <see cref="State"/>; null from an agent too old to say.</summary>
+    public string Version { get; init; }
+
     /// <summary>Words in on <see cref="JobStart"/>, words out on <see cref="JobEnd"/>.</summary>
     public int Words { get; init; }
 
@@ -53,6 +56,7 @@ internal sealed record AgentMessage
                 Machine = Text(root, "machine"),
                 Engine = Text(root, "engine"),
                 Model = Text(root, "model"),
+                Version = Text(root, "version"),
                 Words = Number(root, "words"),
                 Count = Number(root, "count"),
                 DurationMs = root.TryGetProperty("durationMs", out var d) && d.ValueKind == JsonValueKind.Number ? d.GetDouble() : 0

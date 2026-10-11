@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Reflection;
 
 namespace Tharga.Neurolito.Screensaver;
 
@@ -8,6 +9,9 @@ namespace Tharga.Neurolito.Screensaver;
 /// </summary>
 internal static class Program
 {
+    /// <summary>The release this screensaver is, without the commit it was built from.</summary>
+    private static readonly string Version = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0];
+
     [STAThread]
     private static void Main(string[] args)
     {
@@ -41,7 +45,7 @@ internal static class Program
     private static void Run()
     {
         var clock = Stopwatch.StartNew();
-        var scene = new TrafficScene(screensaverRunning: true, seed: Environment.TickCount);
+        var scene = new TrafficScene(screensaverRunning: true, seed: Environment.TickCount, version: Version);
         using var link = new AgentLink(scene, clock, announceIdle: true);
 
         //NOTE: Every monitor shows the scene; closing any - a key or a mouse move on any screen - ends them all.
@@ -54,7 +58,7 @@ internal static class Program
     private static void Preview(IntPtr parent)
     {
         var clock = Stopwatch.StartNew();
-        var scene = new TrafficScene(screensaverRunning: false, seed: Environment.TickCount);
+        var scene = new TrafficScene(screensaverRunning: false, seed: Environment.TickCount, version: Version);
         using var link = new AgentLink(scene, clock, announceIdle: false);
         Application.Run(new SaverForm(scene, () => clock.Elapsed, parent));
     }
@@ -68,6 +72,6 @@ internal static class Program
             "new one until the screensaver starts again.\n\n" +
             "There is nothing to set here. Choose when the screensaver starts in Windows; the agent's own settings are in the " +
             "Neurolito Agent folder in Program Files.",
-            "Neurolito screensaver", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            $"Neurolito screensaver {Version}", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 }
