@@ -11,8 +11,8 @@
     would put the first version back.
 
     Silent install:
-      msiexec /i NeurolitoAgent.msi /qn TEAMKEY=<key> [ENERGYMODE=Never|WhileWorking|WhileReady] [SETSCREENSAVER=0]
-    TEAMKEY, ENERGYMODE, SERVERADDRESS and UPDATESOURCE are kept on upgrade when not given again.
+      msiexec /i NeurolitoAgent.msi /qn TEAMKEY=<key> [ENERGYMODE=Never|WhileWorking|WhileReady] [SETSCREENSAVER=0] [SCREENSAVERMINUTES=10]
+    TEAMKEY, ENERGYMODE, SCREENSAVERMINUTES, SERVERADDRESS and UPDATESOURCE are kept on upgrade when not given again.
   -->
   <Package Name="Neurolito Agent" Manufacturer="Neurolito" Version="$(var.Version)"
            UpgradeCode="bd2bbd7b-e529-4825-86dd-d5f6f3008183" Scope="perMachine" Compressed="yes">
@@ -58,8 +58,32 @@
     <SetProperty Action="KeepUpdateSource" Id="UPDATESOURCE" Value="[SAVED_UPDATESOURCE]" After="AppSearch" Condition="NOT UPDATESOURCE AND SAVED_UPDATESOURCE" Sequence="both" />
     <SetProperty Action="DefaultUpdateSource" Id="UPDATESOURCE" Value="https://github.com/Neurolito/neurolito-agent-windows" After="KeepUpdateSource" Condition="NOT UPDATESOURCE" Sequence="both" />
 
-    <!-- Make the Neurolito screensaver the installing user's own, starting after 10 minutes. Never for other users. -->
+    <!-- Make the Neurolito screensaver the installing user's own, starting after SCREENSAVERMINUTES. Never for other users. -->
     <Property Id="SETSCREENSAVER" Value="1" Secure="yes" />
+
+    <!--
+      How long the computer is idle before the screensaver starts - and so before the agent may work. Windows keeps it in
+      seconds; an installer cannot multiply without a script action, so the minutes are one of a fixed list, each mapped
+      to its seconds. Kept on upgrade, like the energy mode.
+    -->
+    <Property Id="SCREENSAVERMINUTES" Secure="yes" />
+    <Property Id="SAVED_SCREENSAVERMINUTES" Secure="yes">
+      <RegistrySearch Id="SavedScreensaverMinutes" Root="HKLM" Key="SOFTWARE\Neurolito\Agent" Name="Installer:ScreensaverMinutes" Type="raw" Bitness="always64" />
+    </Property>
+    <SetProperty Action="KeepScreensaverMinutes" Id="SCREENSAVERMINUTES" Value="[SAVED_SCREENSAVERMINUTES]" After="AppSearch" Condition="NOT SCREENSAVERMINUTES AND SAVED_SCREENSAVERMINUTES" Sequence="both" />
+    <SetProperty Action="DefaultScreensaverMinutes" Id="SCREENSAVERMINUTES" Value="10" After="KeepScreensaverMinutes" Condition="NOT SCREENSAVERMINUTES" Sequence="both" />
+    <SetProperty Action="ScreensaverSeconds1" Id="SCREENSAVERSECONDS" Value="60" After="DefaultScreensaverMinutes" Condition="SCREENSAVERMINUTES = &quot;1&quot;" Sequence="both" />
+    <SetProperty Action="ScreensaverSeconds2" Id="SCREENSAVERSECONDS" Value="120" After="ScreensaverSeconds1" Condition="SCREENSAVERMINUTES = &quot;2&quot;" Sequence="both" />
+    <SetProperty Action="ScreensaverSeconds3" Id="SCREENSAVERSECONDS" Value="180" After="ScreensaverSeconds2" Condition="SCREENSAVERMINUTES = &quot;3&quot;" Sequence="both" />
+    <SetProperty Action="ScreensaverSeconds5" Id="SCREENSAVERSECONDS" Value="300" After="ScreensaverSeconds3" Condition="SCREENSAVERMINUTES = &quot;5&quot;" Sequence="both" />
+    <SetProperty Action="ScreensaverSeconds10" Id="SCREENSAVERSECONDS" Value="600" After="ScreensaverSeconds5" Condition="SCREENSAVERMINUTES = &quot;10&quot;" Sequence="both" />
+    <SetProperty Action="ScreensaverSeconds15" Id="SCREENSAVERSECONDS" Value="900" After="ScreensaverSeconds10" Condition="SCREENSAVERMINUTES = &quot;15&quot;" Sequence="both" />
+    <SetProperty Action="ScreensaverSeconds20" Id="SCREENSAVERSECONDS" Value="1200" After="ScreensaverSeconds15" Condition="SCREENSAVERMINUTES = &quot;20&quot;" Sequence="both" />
+    <SetProperty Action="ScreensaverSeconds30" Id="SCREENSAVERSECONDS" Value="1800" After="ScreensaverSeconds20" Condition="SCREENSAVERMINUTES = &quot;30&quot;" Sequence="both" />
+    <SetProperty Action="ScreensaverSeconds45" Id="SCREENSAVERSECONDS" Value="2700" After="ScreensaverSeconds30" Condition="SCREENSAVERMINUTES = &quot;45&quot;" Sequence="both" />
+    <SetProperty Action="ScreensaverSeconds60" Id="SCREENSAVERSECONDS" Value="3600" After="ScreensaverSeconds45" Condition="SCREENSAVERMINUTES = &quot;60&quot;" Sequence="both" />
+    <Launch Condition="Installed OR SETSCREENSAVER &lt;&gt; 1 OR SCREENSAVERSECONDS"
+            Message="SCREENSAVERMINUTES must be one of 1, 2, 3, 5, 10, 15, 20, 30, 45, 60." />
 
     <Launch Condition="Installed OR TEAMKEY OR WIX_UPGRADE_DETECTED OR UILevel &gt;= 4"
             Message="The Neurolito Agent needs your team's install key: msiexec /i NeurolitoAgent.msi TEAMKEY=&lt;key&gt;. The install page on neurolito.com shows it." />
@@ -158,6 +182,7 @@
         <RegistryValue Name="LlamaServer:ModelsPath" Value="[ModelsFolder]" Type="string" />
         <RegistryValue Name="Desktop:Enabled" Value="true" Type="string" />
         <RegistryValue Name="Desktop:EnergyMode" Value="[ENERGYMODE]" Type="string" />
+        <RegistryValue Name="Installer:ScreensaverMinutes" Value="[SCREENSAVERMINUTES]" Type="string" />
         <RegistryValue Name="Updates:Enabled" Value="true" Type="string" />
         <RegistryValue Name="Updates:Source" Value="[UPDATESOURCE]" Type="string" />
         <RegistryValue Name="Urls" Value="http://127.0.0.1:5180" Type="string" />
@@ -202,7 +227,7 @@
       <RegistryKey Root="HKCU" Key="Control Panel\Desktop">
         <RegistryValue Name="SCRNSAVE.EXE" Value="[System64Folder]Neurolito.scr" Type="string" KeyPath="yes" />
         <RegistryValue Name="ScreenSaveActive" Value="1" Type="string" />
-        <RegistryValue Name="ScreenSaveTimeOut" Value="600" Type="string" />
+        <RegistryValue Name="ScreenSaveTimeOut" Value="[SCREENSAVERSECONDS]" Type="string" />
       </RegistryKey>
     </Component>
   </Fragment>

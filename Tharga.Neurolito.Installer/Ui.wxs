@@ -43,6 +43,19 @@
       <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
       <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
 
+      <ComboBox Property="SCREENSAVERMINUTES">
+        <ListItem Value="1" Text="1" />
+        <ListItem Value="2" Text="2" />
+        <ListItem Value="3" Text="3" />
+        <ListItem Value="5" Text="5" />
+        <ListItem Value="10" Text="10" />
+        <ListItem Value="15" Text="15" />
+        <ListItem Value="20" Text="20" />
+        <ListItem Value="30" Text="30" />
+        <ListItem Value="45" Text="45" />
+        <ListItem Value="60" Text="60" />
+      </ComboBox>
+
       <RadioButtonGroup Property="UI_ENERGYMODE">
         <RadioButton Value="Never" X="0" Y="0" Width="320" Height="14" Text="Never - Windows sleeps as it is set to" />
         <RadioButton Value="WhileWorking" X="0" Y="16" Width="320" Height="14" Text="While working - a running job finishes before the machine sleeps" />
@@ -63,8 +76,11 @@
         <Control Id="EnergyLabel" Type="Text" X="20" Y="96" Width="330" Height="12" NoPrefix="yes" Text="Keep this computer awake for the agent:" />
         <Control Id="Energy" Type="RadioButtonGroup" X="20" Y="110" Width="330" Height="48" Property="UI_ENERGYMODE" />
 
-        <Control Id="ScreensaverBox" Type="CheckBox" X="20" Y="166" Width="330" Height="14" Property="SETSCREENSAVER" CheckBoxValue="1"
-                 Text="Use the Neurolito screensaver for me, after 10 minutes" />
+        <Control Id="ScreensaverBox" Type="CheckBox" X="20" Y="166" Width="210" Height="14" Property="SETSCREENSAVER" CheckBoxValue="1"
+                 Text="Use the Neurolito screensaver for me, after" />
+        <Control Id="ScreensaverMinutes" Type="ComboBox" X="232" Y="165" Width="40" Height="16" Property="SCREENSAVERMINUTES" ComboList="yes" Sorted="no"
+                 DisableCondition="SETSCREENSAVER &lt;&gt; 1" EnableCondition="SETSCREENSAVER = 1" />
+        <Control Id="ScreensaverMinutesLabel" Type="Text" X="276" Y="168" Width="60" Height="12" NoPrefix="yes" Text="minutes" />
         <Control Id="ScreensaverNote" Type="Text" X="33" Y="181" Width="317" Height="40" NoPrefix="yes"
                  Text="The agent works while the screensaver runs or the computer is locked, and steps aside when you come back. You can choose another screensaver later; the agent then works while the computer is locked." />
 
