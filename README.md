@@ -81,7 +81,17 @@ The MSI, from a checkout of [`neurolito-agent`](https://github.com/Neurolito/neu
 ./build/build.ps1 -AgentProject ../neurolito-agent/Tharga.Neurolito.Agent/Tharga.Neurolito.Agent.csproj -Version 0.1.0
 ```
 
-It lands in `artifacts/msi`.
+It lands in `artifacts/msi`, with the update package beside it in `artifacts/releases`.
+
+## Releases and updates
+
+An installed agent updates itself: it looks at this repository's [releases](https://github.com/Neurolito/neurolito-agent-windows/releases)
+every few hours, downloads a new version, finishes the job it is running and restarts on the new one. The update
+replaces the agent, llama.cpp and the screensaver together.
+
+A release is a tag, `v<major>.<minor>.<patch>`. The `Release` workflow builds the agent named in `build/agent.json`
+with llama.cpp and the screensaver, makes the update package (small, against the release before), and publishes it
+with the MSI. Every pull request builds the same as a trial, kept as the run's artifacts.
 
 To try the screensaver without installing it, run `Neurolito.exe /s` from the build output (any key or mouse movement
 ends it), or `/p 0` for nothing. With no agent running it says so; with an agent running in desktop mode

@@ -14,13 +14,17 @@
 .PARAMETER Version
     The release's version, three numbers. The agent, the package and the MSI all carry it.
 
+.PARAMETER RequireUpdater
+    Refuse an agent without Velopack. A release must have it: an agent installed without it can never update again.
+
 .EXAMPLE
     ./build/build.ps1 -AgentProject ../neurolito-agent/Tharga.Neurolito.Agent/Tharga.Neurolito.Agent.csproj -Version 0.2.0
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)] [string] $AgentProject,
-    [Parameter(Mandatory)] [string] $Version
+    [Parameter(Mandatory)] [string] $Version,
+    [switch] $RequireUpdater
 )
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -42,6 +46,11 @@ dotnet publish $AgentProject -c Release -r win-x64 --self-contained -o $stage -p
 Check 'Publishing the agent'
 # Development settings are for a developer's machine, not an installed agent.
 Get-ChildItem $stage -Filter 'appsettings.Development.json' | Remove-Item
+if (-not (Test-Path (Join-Path $stage 'Velopack.dll'))) {
+    $message = 'This agent cannot update itself: it was built without Velopack.'
+    if ($RequireUpdater) { throw "$message A release needs an agent that can." }
+    Write-Warning "$message Fine for a trial build, not for a release."
+}
 
 Step 'Screensaver'
 dotnet publish (Join-Path $root 'Tharga.Neurolito.Screensaver') -c Release -r win-x64 --self-contained -o (Join-Path $stage 'screensaver') `

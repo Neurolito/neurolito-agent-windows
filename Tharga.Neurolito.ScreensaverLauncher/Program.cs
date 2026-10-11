@@ -5,10 +5,16 @@ using Microsoft.Win32.SafeHandles;
 
 // Windows starts this as the screensaver (Neurolito.scr in System32). It starts the real screensaver, which is updated
 // with the agent, from the agent's install folder - passing on /s, /p <window> or /c as they came - and ends with it.
+//
+// The real screensaver is run from a copy in the user's own folder, one per version. The agent updates itself while
+// nobody uses the machine - which is when the screensaver runs - and the update replaces the install folder's current\
+// as a whole, which Windows refuses while a program in it is running.
 
 var folder = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Neurolito\Agent")?.GetValue("InstallFolder") as string;
-var screensaver = folder == null ? null : Path.Combine(folder, "current", "screensaver", "Neurolito.exe");
-if (screensaver == null || !File.Exists(screensaver)) return 1;
+var installed = folder == null ? null : Path.Combine(folder, "current", "screensaver", "Neurolito.exe");
+if (installed == null || !File.Exists(installed)) return 1;
+
+var screensaver = Copy.Of(installed) ?? installed;
 
 var start = new ProcessStartInfo(screensaver) { UseShellExecute = false };
 foreach (var argument in args) start.ArgumentList.Add(argument);
@@ -20,6 +26,44 @@ if (process == null) return 1;
 Job.Add(process);
 process.WaitForExit();
 return process.ExitCode;
+
+internal static class Copy
+{
+    /// <summary>
+    /// The screensaver copied to %LOCALAPPDATA%\Neurolito\screensaver\&lt;version&gt;\, made once per version; older
+    /// versions' copies are removed. Null when it cannot be made, and the installed one is run instead.
+    /// </summary>
+    public static string Of(string installed)
+    {
+        try
+        {
+            var version = FileVersionInfo.GetVersionInfo(installed).FileVersion ?? File.GetLastWriteTimeUtc(installed).Ticks.ToString();
+            var root = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Neurolito", "screensaver");
+            var target = Path.Combine(root, version, "Neurolito.exe");
+
+            if (!File.Exists(target) || new FileInfo(target).Length != new FileInfo(installed).Length)
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                var partial = target + ".partial";
+                File.Copy(installed, partial, true);
+                File.Move(partial, target, true);
+            }
+
+            foreach (var old in Directory.EnumerateDirectories(root).Where(x => !string.Equals(Path.GetFileName(x), version, StringComparison.OrdinalIgnoreCase)))
+            {
+                try { Directory.Delete(old, true); }
+                catch (IOException) { /* still running, or in use: next time */ }
+                catch (UnauthorizedAccessException) { }
+            }
+
+            return target;
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            return null;
+        }
+    }
+}
 
 internal static class Job
 {

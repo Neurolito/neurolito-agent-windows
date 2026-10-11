@@ -1,0 +1,52 @@
+name: Release
+
+# A tag v<major>.<minor>.<patch> publishes a release: the update package that installed agents read (Velopack's
+# releases.win.json and packages) and the MSI, as a GitHub release of this repository.
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Version from the tag
+        shell: pwsh
+        run: |
+          $version = '${{ github.ref_name }}'.TrimStart('v')
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "A release tag is v<major>.<minor>.<patch>, not ${{ github.ref_name }}." }
+          "VERSION=$version" >> $env:GITHUB_ENV
+      - name: Agent source
+        shell: pwsh
+        run: |
+          $agent = Get-Content build/agent.json -Raw | ConvertFrom-Json
+          git clone --quiet "https://github.com/$($agent.repository).git" agent-source
+          git -C agent-source checkout --quiet $agent.ref
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet tool install -g vpk --version 1.2.161
+      - name: The previous release, for a small update
+        shell: pwsh
+        run: |
+          # Velopack makes a delta against the release before; the first release has none.
+          vpk download github --repoUrl "https://github.com/${{ github.repository }}" --token "${{ secrets.GITHUB_TOKEN }}" --outputDir artifacts/releases
+          if ($LASTEXITCODE) { Write-Host 'No earlier release; this one is full only.'; $global:LASTEXITCODE = 0 }
+      - name: Build the release
+        shell: pwsh
+        run: ./build/build.ps1 -AgentProject agent-source/Tharga.Neurolito.Agent/Tharga.Neurolito.Agent.csproj -Version $env:VERSION -RequireUpdater
+      # Signing comes here once its route is decided (SignPath Foundation or Azure Trusted Signing): the agent, the
+      # screensaver, the launcher and the MSI. Until then Windows SmartScreen warns on the MSI.
+      - name: Publish
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          vpk upload github --repoUrl "https://github.com/${{ github.repository }}" --token "$env:GH_TOKEN" --outputDir artifacts/releases `
+            --tag "v$env:VERSION" --releaseName "Neurolito Agent $env:VERSION" --publish
+          if ($LASTEXITCODE) { throw 'Publishing the update package failed.' }
+          gh release upload "v$env:VERSION" artifacts/msi/NeurolitoAgent.msi --repo "${{ github.repository }}"
