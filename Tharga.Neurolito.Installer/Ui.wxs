@@ -1,0 +1,90 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+
+  <!--
+    Welcome, then one page of settings - the team key, the energy mode, the screensaver - then install. WixUI_Minimal's
+    shape, without its licence page and with the settings page in its place.
+  -->
+  <Fragment>
+    <UI Id="NeurolitoUI">
+      <TextStyle Id="WixUI_Font_Normal" FaceName="Tahoma" Size="8" />
+      <TextStyle Id="WixUI_Font_Bigger" FaceName="Tahoma" Size="12" />
+      <TextStyle Id="WixUI_Font_Title" FaceName="Tahoma" Size="9" Bold="yes" />
+      <Property Id="DefaultUIFont" Value="WixUI_Font_Normal" />
+
+      <DialogRef Id="ErrorDlg" />
+      <DialogRef Id="FatalError" />
+      <DialogRef Id="FilesInUse" />
+      <DialogRef Id="MsiRMFilesInUse" />
+      <DialogRef Id="PrepareDlg" />
+      <DialogRef Id="ProgressDlg" />
+      <DialogRef Id="ResumeDlg" />
+      <DialogRef Id="UserExit" />
+      <DialogRef Id="WelcomeDlg" />
+      <DialogRef Id="VerifyReadyDlg" />
+      <DialogRef Id="MaintenanceWelcomeDlg" />
+      <DialogRef Id="MaintenanceTypeDlg" />
+
+      <Publish Dialog="ExitDialog" Control="Finish" Event="EndDialog" Value="Return" Order="999" />
+
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="NeurolitoSettingsDlg" Condition="NOT Installed" />
+      <Publish Dialog="WelcomeDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="Installed AND PATCH" />
+
+      <Publish Dialog="NeurolitoSettingsDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" />
+      <Publish Dialog="NeurolitoSettingsDlg" Control="Next" Property="ENERGYMODE" Value="[UI_ENERGYMODE]" Order="1" />
+      <Publish Dialog="NeurolitoSettingsDlg" Control="Next" Event="NewDialog" Value="VerifyReadyDlg" Condition="TEAMKEY OR WIX_UPGRADE_DETECTED" Order="2" />
+      <Publish Dialog="NeurolitoSettingsDlg" Control="Next" Event="SpawnDialog" Value="NeurolitoNoKeyDlg" Condition="NOT TEAMKEY AND NOT WIX_UPGRADE_DETECTED" Order="3" />
+
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="NeurolitoSettingsDlg" Order="1" Condition="NOT Installed" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="MaintenanceTypeDlg" Order="2" Condition="Installed AND NOT PATCH" />
+      <Publish Dialog="VerifyReadyDlg" Control="Back" Event="NewDialog" Value="WelcomeDlg" Order="3" Condition="Installed AND PATCH" />
+
+      <Publish Dialog="MaintenanceWelcomeDlg" Control="Next" Event="NewDialog" Value="MaintenanceTypeDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RepairButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="RemoveButton" Event="NewDialog" Value="VerifyReadyDlg" />
+      <Publish Dialog="MaintenanceTypeDlg" Control="Back" Event="NewDialog" Value="MaintenanceWelcomeDlg" />
+
+      <RadioButtonGroup Property="UI_ENERGYMODE">
+        <RadioButton Value="Never" X="0" Y="0" Width="320" Height="14" Text="Never - Windows sleeps as it is set to" />
+        <RadioButton Value="WhileWorking" X="0" Y="16" Width="320" Height="14" Text="While working - a running job finishes before the machine sleeps" />
+        <RadioButton Value="WhileReady" X="0" Y="32" Width="320" Height="14" Text="While ready - stay awake to take work whenever nobody uses it" />
+      </RadioButtonGroup>
+
+      <Dialog Id="NeurolitoSettingsDlg" Width="370" Height="270" Title="Neurolito Agent Setup">
+        <Control Id="BannerBitmap" Type="Bitmap" X="0" Y="0" Width="370" Height="44" TabSkip="no" Text="WixUI_Bmp_Banner" />
+        <Control Id="Title" Type="Text" X="15" Y="6" Width="270" Height="15" Transparent="yes" NoPrefix="yes" Text="{\WixUI_Font_Title}Your team and this machine" />
+        <Control Id="Description" Type="Text" X="25" Y="23" Width="280" Height="15" Transparent="yes" NoPrefix="yes" Text="Connect the agent to your team, and choose how it treats this computer." />
+        <Control Id="BannerLine" Type="Line" X="0" Y="44" Width="370" Height="0" />
+
+        <Control Id="KeyLabel" Type="Text" X="20" Y="54" Width="330" Height="12" NoPrefix="yes" Text="Your team's install key, from the install page on neurolito.com:" />
+        <Control Id="KeyEdit" Type="Edit" X="20" Y="68" Width="330" Height="18" Property="TEAMKEY" Password="yes" Text="{512}" />
+        <Control Id="KeyKept" Type="Text" X="20" Y="87" Width="330" Height="10" NoPrefix="yes" Hidden="yes" ShowCondition="WIX_UPGRADE_DETECTED"
+                 Text="Leave it empty to keep the key this computer already has." />
+
+        <Control Id="EnergyLabel" Type="Text" X="20" Y="96" Width="330" Height="12" NoPrefix="yes" Text="Keep this computer awake for the agent:" />
+        <Control Id="Energy" Type="RadioButtonGroup" X="20" Y="110" Width="330" Height="48" Property="UI_ENERGYMODE" />
+
+        <Control Id="ScreensaverBox" Type="CheckBox" X="20" Y="166" Width="330" Height="14" Property="SETSCREENSAVER" CheckBoxValue="1"
+                 Text="Use the Neurolito screensaver for me, after 10 minutes" />
+        <Control Id="ScreensaverNote" Type="Text" X="33" Y="181" Width="317" Height="40" NoPrefix="yes"
+                 Text="The agent works while the screensaver runs or the computer is locked, and steps aside when you come back. You can choose another screensaver later; the agent then works while the computer is locked." />
+
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="370" Height="0" />
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+      </Dialog>
+
+      <Dialog Id="NeurolitoNoKeyDlg" Width="260" Height="85" Title="Neurolito Agent Setup" NoMinimize="yes">
+        <Control Id="Text" Type="Text" X="15" Y="15" Width="230" Height="35" NoPrefix="yes"
+                 Text="Enter your team's install key. The install page on neurolito.com shows it; the agent needs it to know which team it works for." />
+        <Control Id="Ok" Type="PushButton" X="102" Y="58" Width="56" Height="17" Default="yes" Cancel="yes" Text="!(loc.WixUIOK)">
+          <Publish Event="EndDialog" Value="Return" />
+        </Control>
+      </Dialog>
+    </UI>
+
+    <UIRef Id="WixUI_Common" />
+  </Fragment>
+</Wix>

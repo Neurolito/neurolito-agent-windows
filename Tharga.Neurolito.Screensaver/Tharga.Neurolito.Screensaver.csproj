@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
+    <!-- Published as Neurolito.scr: Windows lists a screensaver by its file name. -->
+    <AssemblyName>Neurolito</AssemblyName>
+    <RootNamespace>Tharga.Neurolito.Screensaver</RootNamespace>
+    <Version>0.1.0</Version>
+    <Product>Neurolito screensaver</Product>
+    <Description>Shows what the Neurolito agent on this machine is doing, as lorem ipsum.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Tharga.Neurolito.Screensaver.Tests" />
+  </ItemGroup>
+
+</Project>

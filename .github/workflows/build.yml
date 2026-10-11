@@ -1,0 +1,48 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet build Tharga.Neurolito.Windows.slnx -c Release
+      - run: dotnet test Tharga.Neurolito.Windows.slnx -c Release --no-build
+
+  # The whole release as a trial - the agent named in build/agent.json, llama.cpp, the screensaver, the update package
+  # and the MSI - kept as the run's artifacts. Nothing is published.
+  package:
+    runs-on: windows-latest
+    needs: build
+    steps:
+      - uses: actions/checkout@v7
+      - name: Agent source
+        shell: pwsh
+        run: |
+          $agent = Get-Content build/agent.json -Raw | ConvertFrom-Json
+          git clone --quiet "https://github.com/$($agent.repository).git" agent-source
+          git -C agent-source checkout --quiet $agent.ref
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+      - run: dotnet tool install -g vpk --version 1.2.161
+      - name: Build the release
+        shell: pwsh
+        run: ./build/build.ps1 -AgentProject agent-source/Tharga.Neurolito.Agent/Tharga.Neurolito.Agent.csproj -Version "0.0.${{ github.run_number }}"
+      - uses: actions/upload-artifact@v7
+        with:
+          if-no-files-found: warn
+          name: neurolito-agent-windows-0.0.${{ github.run_number }}
+          path: |
+            artifacts/msi/NeurolitoAgent.msi
+            artifacts/releases/

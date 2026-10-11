@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The screensaver Windows starts, from System32: a small launcher that never changes, so the real screensaver can be
+    updated with the agent in its install folder, which the agent's own account may write and System32 is not.
+  -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>NeurolitoLauncher</AssemblyName>
+    <RootNamespace>Tharga.Neurolito.ScreensaverLauncher</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <Version>0.1.0</Version>
+    <Product>Neurolito screensaver</Product>
+  </PropertyGroup>
+
+</Project>

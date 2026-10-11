@@ -1,0 +1,22 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <!--
+    The MSI. Built by build/build.ps1, which first publishes the agent, the screensaver and llama.cpp and passes their
+    folders here. Not in the solution: it needs those folders, which a plain build of the solution does not make.
+  -->
+  <PropertyGroup>
+    <OutputName>NeurolitoAgent</OutputName>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <Version Condition="'$(Version)' == ''">0.1.0</Version>
+    <DefineConstants>Version=$(Version);AgentDir=$(AgentDir);ScreensaverFile=$(ScreensaverFile)</DefineConstants>
+    <!-- ICE38/ICE43/ICE57: the optional screensaver choice is a per-user registry value in a per-machine package, by design.
+         ICE09: the screensaver is in System32, which is where Windows looks, and goes when the agent is uninstalled. -->
+    <SuppressIces>ICE09;ICE38;ICE43;ICE57</SuppressIces>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+    <PackageReference Include="WixToolset.Util.wixext" Version="5.0.2" />
+  </ItemGroup>
+
+</Project>
