@@ -1,8 +1,9 @@
 # Neurolito Agent for Windows
 
 Turns a Windows desktop into an agent for [Neurolito](https://neurolito.com) that works while nobody is using the
-machine and steps aside when someone does. Its screensaver shows the work going on: text arriving and leaving, drawn as
-lorem ipsum.
+machine and steps aside when someone does. Its screensaver shows the work going on: text arriving, its letters swirling
+while the model reads it, and the answer building, all drawn as lorem ipsum. Around it: a model loading or unloading, the
+machine's work units by the hour, and how many queued jobs it can take, or is missing a model for.
 
 > **Installing an agent?** Use the [install guide](https://neurolito.com/install-agent). It shows the route that fits
 > your machine.

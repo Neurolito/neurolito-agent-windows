@@ -25,7 +25,7 @@ public class AgentMessageTests
         var message = AgentMessage.Parse("""{"type":"state","presence":"Available","working":true,"machine":"DESK1","engine":"llama.cpp b11541","model":"qwen3:1.7b","version":"0.1.1"}""");
 
         Assert.Equal((AgentMessage.State, "Available", true, "DESK1", "llama.cpp b11541", "qwen3:1.7b", "0.1.1"),
-            (message.Kind, message.Presence, message.Working, message.Machine, message.Engine, message.Model, message.Version));
+            (message.Kind, message.Presence, message.Working, message.Machine, message.Engine, message.ModelName, message.Version));
     }
 
     [Fact]
@@ -134,6 +134,91 @@ public class TrafficSceneTests
         scene.Apply(new AgentMessage { Kind = AgentMessage.JobStart, Words = 1 }, T0);
 
         Assert.Empty(scene.Frame(T0).Answer);
+    }
+
+    [Fact]
+    public void AModelLoadingIsShownUntilItHasLoadedAndThenSaysHowLongItTook()
+    {
+        var scene = new TrafficScene(true);
+        scene.Apply(new AgentMessage { Kind = AgentMessage.State, Presence = "Available", LoadedModels = [] }, T0);
+        scene.Apply(new AgentMessage { Kind = AgentMessage.Model, Change = AgentMessage.Loading, ModelName = "qwen3-coder:30b" }, T0);
+
+        Assert.Equal("Loading qwen3-coder:30b into memory · 12 s", scene.Frame(T0 + TimeSpan.FromSeconds(12)).ModelActivity);
+
+        scene.Apply(new AgentMessage { Kind = AgentMessage.Model, Change = AgentMessage.Loaded, ModelName = "qwen3-coder:30b" }, T0 + TimeSpan.FromSeconds(14.2));
+        var loaded = scene.Frame(T0 + TimeSpan.FromSeconds(15));
+        Assert.Null(loaded.ModelActivity);
+        Assert.Equal($"Loaded qwen3-coder:30b in {14.2:0.0} s", loaded.ModelNote);
+
+        scene.Apply(new AgentMessage { Kind = AgentMessage.Model, Change = AgentMessage.Unloaded, ModelName = "qwen3-coder:30b" }, T0 + TimeSpan.FromMinutes(10));
+        Assert.StartsWith("Unloaded qwen3-coder:30b", scene.Frame(T0 + TimeSpan.FromMinutes(10)).ModelNote);
+    }
+
+    [Fact]
+    public void ThePromptsLettersSwirlUntilTheFirstTokenAndThenJoinTheAnswer()
+    {
+        var scene = new TrafficScene(true);
+        scene.Apply(new AgentMessage { Kind = AgentMessage.JobStart, Words = 20 }, T0);
+
+        var landed = T0 + TrafficScene.LaunchWindow + TrafficScene.Flight + TrafficScene.Gather;
+        var swirling = scene.Frame(landed).Swirl;
+        Assert.NotEmpty(swirling);
+        Assert.All(swirling, x => Assert.Equal(0, x.Arrival));
+        Assert.All(swirling, x => Assert.InRange(x.X, 0.2f, 0.7f));
+
+        scene.Apply(new AgentMessage { Kind = AgentMessage.Tokens, Count = 1 }, landed);
+        Assert.Empty(scene.Frame(landed + TrafficScene.Release + TimeSpan.FromSeconds(1)).Swirl);
+    }
+
+    [Fact]
+    public void ALongPromptSwirlsAtMostSoManyLetters()
+    {
+        var scene = new TrafficScene(true);
+        scene.Apply(new AgentMessage { Kind = AgentMessage.JobStart, Words = 5000 }, T0);
+
+        Assert.Equal(TrafficScene.MaxSwirl, scene.Frame(T0 + TimeSpan.FromSeconds(10)).Swirl.Count);
+    }
+
+    [Fact]
+    public void WorkAndTheQueueAreShownOnceTheAgentSendsThem()
+    {
+        var scene = new TrafficScene(true);
+        scene.Apply(new AgentMessage { Kind = AgentMessage.State, Presence = "Available" }, T0);
+        Assert.Null(scene.Frame(T0).WorkToday);
+        Assert.Null(scene.Frame(T0).Queue);
+
+        scene.Apply(AgentMessage.Parse("""{"type":"work","workUnitsToday":12345.6,"jobsToday":18,"hours":[1,2,3],"days":[1000,2000.5]}"""), T0);
+        scene.Apply(AgentMessage.Parse("""{"type":"queue","pickable":4,"unpickable":7,"missing":[{"model":"qwen3-coder:30b","jobs":5}]}"""), T0);
+
+        var frame = scene.Frame(T0);
+        Assert.Equal("12.3k WU today · 18 jobs", frame.WorkToday.Replace(',', '.'));
+        Assert.Equal([1d, 2d, 3d], frame.WorkHours);
+        Assert.Equal(new QueueFrame(4, 7, [("qwen3-coder:30b", 5)]).Pickable, frame.Queue.Pickable);
+        Assert.Equal(("qwen3-coder:30b", 5), frame.Queue.Missing.Single());
+
+        scene.SetConnected(false);
+        Assert.Null(scene.Frame(T0).Queue);
+    }
+
+    [Fact]
+    public void AFinishedJobSaysItsWorkUnitsWhenTheAgentDoes()
+    {
+        var scene = new TrafficScene(true);
+        scene.Apply(new AgentMessage { Kind = AgentMessage.JobStart, Words = 48 }, T0);
+        scene.Apply(new AgentMessage { Kind = AgentMessage.JobEnd, Words = 412, DurationMs = 12400, WorkUnits = 35.24 }, T0);
+
+        Assert.EndsWith($" · {35.2:0.#} WU", scene.Frame(T0).Summary);
+        Assert.Contains($" · {35.2:0.#} WU since the screensaver started", scene.Frame(T0).Totals);
+    }
+
+    [Theory]
+    [InlineData(35.24, "35.2")]
+    [InlineData(812, "812")]
+    [InlineData(12345, "12.3k")]
+    [InlineData(4_100_000, "4.1M")]
+    public void WorkUnitsReadAtAGlance(double workUnits, string expected)
+    {
+        Assert.Equal(expected, TrafficScene.WorkUnitsText(workUnits).Replace(',', '.'));
     }
 
     [Fact]
