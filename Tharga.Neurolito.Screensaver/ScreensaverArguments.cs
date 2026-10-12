@@ -10,14 +10,18 @@ internal enum ScreensaverMode
     Preview,
 
     /// <summary><c>/c</c>, or no argument: the Settings button.</summary>
-    Settings
+    Settings,
+
+    /// <summary><c>/user</c>: at logon, without a window - reports the user's screensaver to the agent and makes its changes.</summary>
+    UserSettings
 }
 
 internal readonly record struct ScreensaverArguments(ScreensaverMode Mode, IntPtr Parent)
 {
     /// <summary>
     /// <c>/s</c>, <c>/S</c>, <c>-s</c>, <c>/p 1234</c>, <c>/p:1234</c>, <c>/c</c>, <c>/c:1234</c>. Windows uses
-    /// several spellings, and starts the screensaver with no argument when it is opened from Explorer.
+    /// several spellings, and starts the screensaver with no argument when it is opened from Explorer. <c>/user</c> is
+    /// ours, never Windows'.
     /// </summary>
     public static ScreensaverArguments Parse(string[] args)
     {
@@ -33,6 +37,7 @@ internal readonly record struct ScreensaverArguments(ScreensaverMode Mode, IntPt
         {
             's' => new ScreensaverArguments(ScreensaverMode.Run, IntPtr.Zero),
             'p' => new ScreensaverArguments(ScreensaverMode.Preview, parent),
+            'u' => new ScreensaverArguments(ScreensaverMode.UserSettings, IntPtr.Zero),
             _ => new ScreensaverArguments(ScreensaverMode.Settings, parent)
         };
     }

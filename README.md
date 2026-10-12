@@ -20,6 +20,7 @@ desktop application: the screensaver, the installer, and the build that puts the
 | **The agent, as a Windows service** | Runs the models and takes jobs from your team's queue. It runs as its own low-privilege account (`NT SERVICE\NeurolitoAgent`), starts with Windows, and works whether or not anyone is logged on. |
 | **llama.cpp** (Vulkan build) | The engine the agent drives. One build uses NVIDIA, AMD and Intel graphics cards; no Ollama or Docker needed. Models are downloaded when your team's model set asks for them. |
 | **The screensaver** | A view onto the service. It shows the shape of the work - how much text came in and went out - never the text itself, since the agent serves other teams' jobs too. |
+| **The screensaver settings helper** | A small program without a window, started at each user's logon. It tells the agent that user's screensaver and its timeout, so the machine's page on the Neurolito web shows them, and makes the changes asked for there. It only ever changes a Neurolito screensaver, and never one set by Group Policy. |
 
 ## Working only when the machine is free
 
@@ -33,6 +34,9 @@ one. Neurolito shows the machine as *In use*, *Ready*, *Working* or *Asleep*.
 
 It can also keep the machine from going to sleep while it works - never, only while a job runs, or whenever it is
 ready for work. The default is never: installing the agent does not change how your machine sleeps unless you ask it to.
+
+These choices are made in the installer, and can be seen and changed afterwards on the machine's page on the Neurolito
+web, together with Windows' own sleep and display timeouts and each user's screensaver.
 
 ## What is here
 
@@ -64,6 +68,7 @@ What goes where:
 - `C:\Program Files\Neurolito Agent` - the agent and llama.cpp. The service is `NeurolitoAgent`, running as `NT SERVICE\NeurolitoAgent`.
 - `C:\ProgramData\Neurolito` - models and logs, writable by the service only.
 - `C:\Windows\System32\Neurolito.scr` - the screensaver.
+- `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, `NeurolitoScreensaverSettings` - starts the screensaver settings helper (`Neurolito.scr /user`) at each logon.
 - `HKLM\SOFTWARE\Neurolito\Agent` - the agent's settings, readable by the service and administrators only.
 
 Uninstalling removes all of it, models included.
