@@ -31,6 +31,9 @@ internal static class Program
                     break;
                 case ScreensaverMode.Preview:
                     break;
+                case ScreensaverMode.UserSettings:
+                    UserSettingsHelper.Run();
+                    break;
                 default:
                     Settings();
                     break;
@@ -70,8 +73,8 @@ internal static class Program
             "text arrives and leaves, never the text itself.\n\n" +
             "While it runs, the agent takes work. When you come back, the agent finishes the job it is running and takes no " +
             "new one until the screensaver starts again.\n\n" +
-            "There is nothing to set here. Choose when the screensaver starts in Windows; the agent's own settings are in the " +
-            "Neurolito Agent folder in Program Files.",
+            "There is nothing to set here. Choose when the screensaver starts in Windows, or on this machine's page on the " +
+            "Neurolito web, which shows the screensaver and the power settings and can change them.",
             $"Neurolito screensaver {Version}", MessageBoxButtons.OK, MessageBoxIcon.Information);
     }
 }

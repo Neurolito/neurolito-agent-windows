@@ -119,6 +119,7 @@
       <ComponentRef Id="ServerAddress" />
       <ComponentRef Id="DataFolder" />
       <ComponentRef Id="Screensaver" />
+      <ComponentRef Id="ScreensaverSettingsHelper" />
       <ComponentRef Id="ScreensaverSetting" />
     </Feature>
 
@@ -238,6 +239,16 @@
     -->
     <Component Id="Screensaver" Directory="System64Folder" Guid="d8a7c199-6cf4-45c1-a4bf-ad35ac869864">
       <File Id="NeurolitoScr" Source="$(var.ScreensaverFile)" Name="Neurolito.scr" KeyPath="yes" />
+    </Component>
+
+    <!--
+      The settings helper, started at every user's logon, without a window: it tells the agent the user's screensaver, so
+      the agent's page on the web shows it, and makes the changes asked for there - only to a Neurolito screensaver. The
+      service cannot do this itself: a user's screensaver is in their own registry.
+    -->
+    <Component Id="ScreensaverSettingsHelper" Directory="INSTALLFOLDER" Guid="5b0e7c2d-9a14-4f63-b8d1-2e7a6c9f0b34">
+      <RegistryValue Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run" Name="NeurolitoScreensaverSettings"
+                     Value="&quot;[System64Folder]Neurolito.scr&quot; /user" Type="string" KeyPath="yes" />
     </Component>
 
     <Component Id="ScreensaverSetting" Directory="INSTALLFOLDER" Guid="24911280-d47e-4b28-84fc-7f996099b847" Condition="SETSCREENSAVER = 1">

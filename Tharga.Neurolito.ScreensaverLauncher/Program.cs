@@ -5,6 +5,7 @@ using Microsoft.Win32.SafeHandles;
 
 // Windows starts this as the screensaver (Neurolito.scr in System32). It starts the real screensaver, which is updated
 // with the agent, from the agent's install folder - passing on /s, /p <window> or /c as they came - and ends with it.
+// With /user, at logon, it starts the settings helper and ends at once.
 //
 // The real screensaver is run from a copy in the user's own folder, one per version. The agent updates itself while
 // nobody uses the machine - which is when the screensaver runs - and the update replaces the install folder's current\
@@ -21,6 +22,10 @@ foreach (var argument in args) start.ArgumentList.Add(argument);
 
 using var process = Process.Start(start);
 if (process == null) return 1;
+
+//NOTE: The settings helper (/user) lives for the whole session, and nothing ends it but the logoff, so the launcher need
+//not stay beside it. Its per-version copy stays in use while it runs; the cleanup below skips a folder it cannot delete.
+if (args.Length > 0 && args[0].Trim().TrimStart('/', '-').StartsWith('u')) return 0;
 
 //NOTE: Tied to this process, so a screensaver Windows ends by ending the launcher does not stay behind on the screen.
 Job.Add(process);
