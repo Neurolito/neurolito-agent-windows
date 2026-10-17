@@ -68,7 +68,7 @@ What goes where:
 - `C:\Program Files\Neurolito Agent` - the agent and llama.cpp. The service is `NeurolitoAgent`, running as `NT SERVICE\NeurolitoAgent`.
 - `C:\ProgramData\Neurolito` - models and logs, writable by the service only.
 - `C:\Windows\System32\Neurolito.scr` - the screensaver.
-- `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, `NeurolitoScreensaverSettings` - starts the screensaver settings helper (`Neurolito.scr /user`) at each logon.
+- `C:\Program Files\Neurolito Agent\NeurolitoLauncher.exe` and `HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Run`, `NeurolitoScreensaverSettings` - start the screensaver settings helper (`NeurolitoLauncher.exe /user`) at each logon. On a machine installed by an older version, the screensaver gives its user the same entry in `HKCU` when it runs and starts the helper if it is not running; the helper removes that entry once the agent is uninstalled.
 - `HKLM\SOFTWARE\Neurolito\Agent` - the agent's settings, readable by the service and administrators only.
 
 Uninstalling removes all of it, models included.

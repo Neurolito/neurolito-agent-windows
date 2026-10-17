@@ -14,6 +14,9 @@ namespace Tharga.Neurolito.Screensaver;
 /// </remarks>
 internal sealed class UserSettingsHelper : IDisposable
 {
+    /// <summary>Held by the helper running in this session; another sees it and ends at once.</summary>
+    public const string MutexName = @"Local\NeurolitoScreensaverSettings";
+
     private static readonly TimeSpan Retry = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan Check = TimeSpan.FromSeconds(15);
 
@@ -24,7 +27,9 @@ internal sealed class UserSettingsHelper : IDisposable
     /// <summary>Runs until the user logs off: one per session.</summary>
     public static void Run()
     {
-        using var single = new Mutex(true, @"Local\NeurolitoScreensaverSettings", out var first);
+        if (HelperStartup.Uninstalled()) return;
+
+        using var single = new Mutex(true, MutexName, out var first);
         if (!first) return;
 
         using var helper = new UserSettingsHelper();

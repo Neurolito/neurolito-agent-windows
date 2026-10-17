@@ -114,3 +114,61 @@ public class ScreensaverChangeTests
         Assert.NotNull(new ScreensaverChange(null, seconds).Refusal(Ours));
     }
 }
+
+public class HelperStartupTests
+{
+    private const string LocalData = @"C:\Users\ann\AppData\Local";
+    private const string Copy = @"C:\Users\ann\AppData\Local\Neurolito\screensaver\0.1.5\Neurolito.exe";
+    private const string Ours = $"\"{Copy}\" /user";
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData(@"""C:\Windows\System32\Neurolito.scr"" /user")]
+    [InlineData(@"%SystemRoot%\System32\Neurolito.scr /user")]
+    public void WithoutAMachineEntryThatWorksTheUserGetsTheirOwn(string machine)
+    {
+        Assert.Equal(Ours, HelperStartup.UserEntry(machine, null, Copy, LocalData));
+    }
+
+    [Fact]
+    public void ANewVersionMovesTheUsersEntryToItsCopy()
+    {
+        var old = @"""C:\Users\ann\AppData\Local\Neurolito\screensaver\0.1.4\Neurolito.exe"" /user";
+        Assert.Equal(Ours, HelperStartup.UserEntry(null, old, Copy, LocalData));
+    }
+
+    [Fact]
+    public void AMachineEntryThatNamesAProgramNeedsNoneOfTheUsers()
+    {
+        Assert.Null(HelperStartup.UserEntry(@"""C:\Program Files\Neurolito Agent\NeurolitoLauncher.exe"" /user", Ours, Copy, LocalData));
+    }
+
+    [Fact]
+    public void TheInstallFoldersScreensaverIsNeverTheLogonEntry()
+    {
+        var installed = @"C:\Program Files\Neurolito Agent\current\screensaver\Neurolito.exe";
+        Assert.Null(HelperStartup.UserEntry(null, null, installed, LocalData));
+        Assert.Equal(Ours, HelperStartup.UserEntry(null, Ours, installed, LocalData));
+        Assert.Null(HelperStartup.UserEntry(null, null, @"C:\Users\ann\AppData\Local\NeurolitoOther\Neurolito.exe", LocalData));
+    }
+
+    [Theory]
+    [InlineData(@"""C:\Windows\System32\Neurolito.scr"" /user", true)]
+    [InlineData(@"C:\Windows\System32\NEUROLITO.SCR /user", true)]
+    [InlineData(@"""C:\Program Files\Neurolito Agent\NeurolitoLauncher.exe"" /user", false)]
+    [InlineData(@"""C:\screens.scr\Neurolito.exe"" /user", false)]
+    public void AScreensaverFileIsNotAProgram(string command, bool screensaver)
+    {
+        Assert.Equal(screensaver, HelperStartup.NamesAScreensaver(command));
+    }
+
+    [Fact]
+    public void TheTaskNamesTheProgramSafely()
+    {
+        var xml = System.Xml.Linq.XDocument.Parse(OnDemandTask.Definition(@"C:\Users\a&b\Neurolito.exe", "/user"));
+        System.Xml.Linq.XNamespace ns = "http://schemas.microsoft.com/windows/2004/02/mit/task";
+        Assert.Equal(@"C:\Users\a&b\Neurolito.exe", xml.Descendants(ns + "Command").Single().Value);
+        Assert.Equal("PT0S", xml.Descendants(ns + "ExecutionTimeLimit").Single().Value);
+    }
+}
