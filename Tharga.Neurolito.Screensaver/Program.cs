@@ -47,6 +47,9 @@ internal static class Program
 
     private static void Run()
     {
+        //NOTE: Beside the screen, not before it: the scene shows at once, whatever the Task Scheduler takes.
+        Task.Run(HelperStartup.Ensure);
+
         var clock = Stopwatch.StartNew();
         var scene = new TrafficScene(screensaverRunning: true, seed: Environment.TickCount, version: Version);
         using var link = new AgentLink(scene, clock, announceIdle: true);

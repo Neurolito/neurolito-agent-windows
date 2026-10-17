@@ -245,10 +245,13 @@
       The settings helper, started at every user's logon, without a window: it tells the agent the user's screensaver, so
       the agent's page on the web shows it, and makes the changes asked for there - only to a Neurolito screensaver. The
       service cannot do this itself: a user's screensaver is in their own registry.
+      Started through the launcher as a program, beside the install folder's current\, which updates replace: Windows
+      opens a .scr as "%1" /S, so Neurolito.scr /user started from the shell would run the screensaver instead.
     -->
-    <Component Id="ScreensaverSettingsHelper" Directory="INSTALLFOLDER" Guid="5b0e7c2d-9a14-4f63-b8d1-2e7a6c9f0b34">
+    <Component Id="ScreensaverSettingsHelper" Directory="INSTALLFOLDER" Guid="9c3f61a8-27d4-4e0b-a5f2-6b81d0e4c7a9">
+      <File Id="NeurolitoLauncherExe" Source="$(var.ScreensaverFile)" Name="NeurolitoLauncher.exe" />
       <RegistryValue Root="HKLM" Key="SOFTWARE\Microsoft\Windows\CurrentVersion\Run" Name="NeurolitoScreensaverSettings"
-                     Value="&quot;[System64Folder]Neurolito.scr&quot; /user" Type="string" KeyPath="yes" />
+                     Value="&quot;[INSTALLFOLDER]NeurolitoLauncher.exe&quot; /user" Type="string" KeyPath="yes" />
     </Component>
 
     <Component Id="ScreensaverSetting" Directory="INSTALLFOLDER" Guid="24911280-d47e-4b28-84fc-7f996099b847" Condition="SETSCREENSAVER = 1">
